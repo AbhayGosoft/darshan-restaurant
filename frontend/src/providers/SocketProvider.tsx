@@ -26,7 +26,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     const nextSocket = createSocket(token);
     setSocket(nextSocket);
-    const refreshBookings = () => void queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
+    const refreshBookings = () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin-bookings"] });
+      // Header bell (NotificationBell) — new count + feed.
+      void queryClient.invalidateQueries({ queryKey: ["admin-notifications"] });
+    };
 
     nextSocket.on("connect", () => {
       setConnected(true);

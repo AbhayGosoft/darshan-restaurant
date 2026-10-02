@@ -1,8 +1,10 @@
 import { forwardRef, useState, type InputHTMLAttributes } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export const PasswordInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function PasswordInput({ className, ...props }, ref) {
+    const { t } = useTranslation();
     const [visible, setVisible] = useState(false);
 
     return (
@@ -11,7 +13,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HT
         <button
           type="button"
           className="password-field__toggle"
-          aria-label={visible ? "Hide password" : "Show password"}
+          aria-label={visible ? t("form.hidePassword") : t("form.showPassword")}
           onClick={() => setVisible((current) => !current)}
         >
           {visible ? <EyeOff size={17} /> : <Eye size={17} />}

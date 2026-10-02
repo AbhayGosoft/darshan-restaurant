@@ -78,8 +78,20 @@ describe("verifyPayment", () => {
     expect(prisma.payment.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: "FAILED" } }));
   });
 
+  it("rejects a razorpay_payment_id already used by another order with 409, not a DB 500", async () => {
+    prisma.payment.findUnique
+      .mockResolvedValueOnce({ id: "payment-2", restaurantUserId: "customer-A", status: "CREATED" })
+      .mockResolvedValueOnce({ id: "payment-1", razorpayPaymentId: "pay_1", status: "VERIFIED" });
+    verifyRazorpaySignature.mockReturnValue(true);
+
+    await expect(verifyPayment("customer-A", input)).rejects.toThrow(/already been used/i);
+    expect(prisma.payment.update).not.toHaveBeenCalled();
+  });
+
   it("marks the payment VERIFIED on a valid signature", async () => {
-    prisma.payment.findUnique.mockResolvedValue({ id: "payment-1", restaurantUserId: "customer-A", status: "CREATED" });
+    prisma.payment.findUnique
+      .mockResolvedValueOnce({ id: "payment-1", restaurantUserId: "customer-A", status: "CREATED" })
+      .mockResolvedValueOnce(null);
     verifyRazorpaySignature.mockReturnValue(true);
     prisma.payment.update.mockResolvedValue({ id: "payment-1", razorpayOrderId: "order_1", amount: "99", currency: "INR", status: "VERIFIED" });
 

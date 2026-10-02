@@ -12,7 +12,7 @@ import { socketEvents } from "../socket/socketEvents.js";
 import { policy, decideRefund } from "../config/policy.js";
 import { ApiError } from "../utils/http.js";
 import { resolveAssetUrl } from "../utils/images.js";
-import { combineDateAndTime, formatDateOnly, isWithinBookingWindow, parseDateOnly } from "../utils/dates.js";
+import { combineDateAndTime, formatDateOnly, isSlotInPast, isWithinBookingWindow, parseDateOnly } from "../utils/dates.js";
 import { isValidTime12, to12Hour, to24Hour } from "../utils/slotTime.js";
 import { generateHumanBookingId } from "../utils/bookingId.js";
 import { haversineDistanceKm } from "../utils/geo.js";
@@ -107,6 +107,7 @@ export const createBooking = async (customerId: string, restaurantId: string, in
   const restaurant = await getActiveRestaurantOrThrow(restaurantId);
   const date = assertValidDate(input.date);
   const time24 = assertValidTime(input.time);
+  if (isSlotInPast(date, time24)) throw new ApiError(422, "This slot time has already passed. Please choose a later slot.");
 
   const slot = await prisma.slotConfiguration.findFirst({ where: { restaurantId, time: time24, isActive: true } });
   if (!slot) throw new ApiError(422, "Selected slot is not available for this restaurant.");

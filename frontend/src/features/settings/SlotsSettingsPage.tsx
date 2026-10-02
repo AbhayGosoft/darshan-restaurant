@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Clock, Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { queryClient } from "@/lib/query-client";
@@ -31,6 +32,7 @@ const from12to24 = (time12: string) => {
 };
 
 export function SlotsSettingsPage() {
+  const { t } = useTranslation();
   const restaurantId = useAppStore((state) => state.activeRestaurant!.id);
   const base = `/admin/restaurants/${restaurantId}/slots`;
   const slots = useQuery({ queryKey: ["admin-slots", restaurantId], queryFn: () => api<SlotConfiguration[]>(base) });
@@ -57,32 +59,32 @@ export function SlotsSettingsPage() {
 
   const remove = useMutation({
     mutationFn: (slot: SlotConfiguration) => api<HardDeleteResult>(`${base}/${slot.id}/permanent`, { method: "DELETE" }),
-    onSuccess: (result, slot) => { setNotice(hardDeleteMessage(`The ${slot.time} slot`, result)); setSlotToDelete(null); void invalidate(); },
+    onSuccess: (result, slot) => { setNotice(hardDeleteMessage(t("slots.slotName", { time: slot.time }), result)); setSlotToDelete(null); void invalidate(); },
   });
 
   const openNew = () => { reset({ meal: "LUNCH", time: "12:00", sortOrder: slots.data?.length ?? 0, isActive: true }); setDialog("new"); };
   const openEdit = (slot: SlotConfiguration) => { reset({ meal: slot.meal, time: from12to24(slot.time), sortOrder: slot.sortOrder, isActive: slot.isActive }); setDialog(slot); };
 
   if (slots.isLoading) return <main className="page"><LoadingGrid /></main>;
-  if (slots.isError) return <main className="page"><StateView title="Couldn't load slots" message="Check the backend connection and try once more." action={() => void slots.refetch()} /></main>;
+  if (slots.isError) return <main className="page"><StateView title={t("slots.loadError")} message={t("common.loadErrorMessage")} action={() => void slots.refetch()} /></main>;
 
   const allSlots = slots.data ?? [];
   const inView = allSlots.filter((s) => (view === "active" ? s.isActive : !s.isActive));
   const lunch = inView.filter((s) => s.meal === "LUNCH").sort((a, b) => a.sortOrder - b.sortOrder);
   const dinner = inView.filter((s) => s.meal === "DINNER").sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const renderGroup = (label: string, items: SlotConfiguration[]) => (
+  const renderGroup = (meal: SlotMeal, items: SlotConfiguration[]) => (
     <section className="card">
-      <header className="menu-category-card__head"><strong>{label}</strong></header>
+      <header className="menu-category-card__head"><strong>{t(`slots.meals.${meal}`)}</strong></header>
       <div className="slot-chip-list">
         {items.map((slot) => (
           <div key={slot.id} className={`slot-chip ${slot.isActive ? "" : "slot-chip--inactive"}`}>
             <Clock size={13} /> {slot.time}
-            <button type="button" className="icon-button" aria-label="Edit slot" onClick={() => openEdit(slot)}><Pencil size={13} /></button>
-            <button type="button" className="icon-button icon-button--danger" aria-label="Delete slot permanently" title="Delete permanently" onClick={() => { remove.reset(); setSlotToDelete(slot); }}><Trash2 size={13} /></button>
+            <button type="button" className="icon-button" aria-label={t("slots.editAria")} onClick={() => openEdit(slot)}><Pencil size={13} /></button>
+            <button type="button" className="icon-button icon-button--danger" aria-label={t("slots.deleteAria")} title={t("common.deletePermanently")} onClick={() => { remove.reset(); setSlotToDelete(slot); }}><Trash2 size={13} /></button>
           </div>
         ))}
-        {!items.length && <small className="muted">{view === "active" ? `No ${label.toLowerCase()} slots configured.` : `No deactivated ${label.toLowerCase()} slots.`}</small>}
+        {!items.length && <small className="muted">{t(view === "active" ? "slots.noneConfigured" : "slots.noneDeactivated", { meal: t(`slots.meals.${meal}`) })}</small>}
       </div>
     </section>
   );
@@ -90,34 +92,34 @@ export function SlotsSettingsPage() {
   return (
     <main className="page">
       <section className="resource-head">
-        <span className="eyebrow"><Clock size={14} /> Slots</span>
-        <Button type="button" onClick={openNew}><Plus size={17} /> Add slot</Button>
+        <span className="eyebrow"><Clock size={14} /> {t("slots.title")}</span>
+        <Button type="button" onClick={openNew}><Plus size={17} /> {t("slots.add")}</Button>
       </section>
       <StatusTabs value={view} onChange={setView} activeCount={allSlots.filter((s) => s.isActive).length} inactiveCount={allSlots.filter((s) => !s.isActive).length} />
       {notice && <Notice message={notice} onClose={() => setNotice("")} />}
-      {renderGroup("Lunch", lunch)}
-      {renderGroup("Dinner", dinner)}
+      {renderGroup("LUNCH", lunch)}
+      {renderGroup("DINNER", dinner)}
 
       {dialog && (
-        <ResourceDialog title={dialog === "new" ? "Add slot" : "Edit slot"} eyebrow="Slot configuration" onClose={() => setDialog(null)}>
+        <ResourceDialog title={dialog === "new" ? t("slots.add") : t("slots.edit")} eyebrow={t("slots.eyebrow")} onClose={() => setDialog(null)}>
           <form noValidate onSubmit={handleSubmit((data) => save.mutate(data))}>
             <div className="property-form-grid">
-              <label><span className="label-title">Meal<Req /></span>
-                <select {...register("meal", { required: true })}><option value="LUNCH">Lunch</option><option value="DINNER">Dinner</option></select>
+              <label><span className="label-title">{t("slots.meal")}<Req /></span>
+                <select {...register("meal", { required: true })}><option value="LUNCH">{t("slots.meals.LUNCH")}</option><option value="DINNER">{t("slots.meals.DINNER")}</option></select>
               </label>
-              <label><span className="label-title">Time<Req /></span>
-                <input type="time" {...register("time", { required: "Time is required" })} />
+              <label><span className="label-title">{t("slots.time")}<Req /></span>
+                <input type="time" {...register("time", { required: t("slots.timeRequired") })} />
                 <FieldError error={errors.time} />
               </label>
-              <label>Sort order<input type="number" {...register("sortOrder", { valueAsNumber: true })} /></label>
-              <label className="check-option"><input type="checkbox" {...register("isActive")} /><span>Active</span></label>
+              <label>{t("common.sortOrder")}<input type="number" {...register("sortOrder", { valueAsNumber: true })} /></label>
+              <label className="check-option"><input type="checkbox" {...register("isActive")} /><span>{t("common.active")}</span></label>
             </div>
             {save.error && <div className="form-error">{save.error.message}</div>}
-            <DialogFooter onClose={() => setDialog(null)} loading={save.isPending} label={dialog === "new" ? "Add slot" : "Save changes"} />
+            <DialogFooter onClose={() => setDialog(null)} loading={save.isPending} label={dialog === "new" ? t("slots.add") : t("common.saveChanges")} />
           </form>
         </ResourceDialog>
       )}
-      {slotToDelete && <ConfirmDialog title="Delete slot permanently?" message={`The ${slotToDelete.time} ${slotToDelete.meal.toLowerCase()} slot will be removed. If it has bookings it will be deactivated instead.`} confirmLabel="Delete permanently" danger loading={remove.isPending} error={remove.error?.message} onClose={() => setSlotToDelete(null)} onConfirm={() => remove.mutate(slotToDelete)} />}
+      {slotToDelete && <ConfirmDialog title={t("slots.deleteTitle")} message={t("slots.deleteMessage", { time: slotToDelete.time, meal: t(`slots.meals.${slotToDelete.meal}`) })} confirmLabel={t("common.deletePermanently")} danger loading={remove.isPending} error={remove.error?.message} onClose={() => setSlotToDelete(null)} onConfirm={() => remove.mutate(slotToDelete)} />}
     </main>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Save } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api-client";
 import { queryClient } from "@/lib/query-client";
 import { useAppStore } from "@/store/app-store";
@@ -40,6 +41,7 @@ const emptyForm: GeneralForm = {
 };
 
 export function GeneralSettingsPage() {
+  const { t } = useTranslation();
   const restaurantId = useAppStore((state) => state.activeRestaurant!.id);
   const enterRestaurant = useAppStore((state) => state.enterRestaurant);
   const restaurant = useQuery({ queryKey: ["admin-restaurant", restaurantId], queryFn: () => api<Restaurant>(`/admin/restaurants/${restaurantId}`) });
@@ -96,55 +98,55 @@ export function GeneralSettingsPage() {
   });
 
   if (restaurant.isLoading) return <LoadingGrid />;
-  if (restaurant.isError) return <StateView title="Couldn't load restaurant" message="Check the backend connection and try once more." action={() => void restaurant.refetch()} />;
+  if (restaurant.isError) return <StateView title={t("general.loadError")} message={t("common.loadErrorMessage")} action={() => void restaurant.refetch()} />;
 
   return (
     <form className="settings-form" noValidate onSubmit={handleSubmit((data) => mutation.mutate(data))}>
       <div className="property-form-grid">
         <div className="property-form-grid__wide">
-          <span className="label-title">Banner image</span>
+          <span className="label-title">{t("general.banner")}</span>
           <ImageManager images={banner} onChange={(next) => setBanner(next.slice(-1).map((image, sortOrder) => ({ imageUrl: image.imageUrl, sortOrder })))} />
         </div>
         <div className="property-form-grid__wide">
-          <span className="label-title">Gallery images</span>
+          <span className="label-title">{t("general.gallery")}</span>
           <ImageManager images={gallery} onChange={(next) => setGallery(normalizeCover(next, false))} />
         </div>
-        <label><span className="label-title">Restaurant name<Req /></span>
-          <input {...register("name", { required: "Restaurant name is required", minLength: { value: 2, message: "Enter at least 2 characters" } })} />
+        <label><span className="label-title">{t("restaurants.nameLabel")}<Req /></span>
+          <input {...register("name", { required: t("general.nameRequired"), minLength: { value: 2, message: t("general.nameMinLength") } })} />
           <FieldError error={errors.name} />
         </label>
-        <label><span className="label-title">Cuisine label<Req /></span>
-          <input placeholder="Pure Veg • North Indian • Chinese" {...register("cuisineLabel", { required: "Cuisine label is required" })} />
+        <label><span className="label-title">{t("restaurants.cuisineLabel")}<Req /></span>
+          <input placeholder={t("general.cuisinePlaceholder")} {...register("cuisineLabel", { required: t("restaurants.cuisineRequired") })} />
           <FieldError error={errors.cuisineLabel} />
         </label>
-        <label className="check-option"><input type="checkbox" {...register("isPureVeg")} /><span>Pure vegetarian restaurant</span></label>
+        <label className="check-option"><input type="checkbox" {...register("isPureVeg")} /><span>{t("general.pureVeg")}</span></label>
         {categories.data && (
-          <CheckboxList title="Categories" items={categories.data.map((c) => ({ id: c.id, label: c.label }))} selected={selectedCategoryIds} onChange={setSelectedCategoryIds} />
+          <CheckboxList title={t("general.categories")} items={categories.data.map((c) => ({ id: c.id, label: c.label }))} selected={selectedCategoryIds} onChange={setSelectedCategoryIds} />
         )}
-        <label className="property-form-grid__wide">About<textarea rows={3} {...register("about")} /></label>
-        <label><span className="label-title">Prep time min (mins)<Req /></span><input type="number" min={0} {...register("prepTimeMin", { required: true, valueAsNumber: true })} /></label>
-        <label><span className="label-title">Prep time max (mins)<Req /></span><input type="number" min={0} {...register("prepTimeMax", { required: true, valueAsNumber: true })} /></label>
-        <label><span className="label-title">Price for two (₹)<Req /></span><input type="number" min={0} {...register("priceForTwo", { required: true, valueAsNumber: true })} /></label>
-        <label>Offer text<input placeholder="50% OFF" {...register("offerText")} /></label>
-        <label>Offer sub text<input placeholder="up to ₹100 on first order" {...register("offerSubText")} /></label>
-        <label className="property-form-grid__wide"><span className="label-title">Address<Req /></span>
-          <input {...register("addressLine", { required: "Address is required" })} />
+        <label className="property-form-grid__wide">{t("general.about")}<textarea rows={3} {...register("about")} /></label>
+        <label><span className="label-title">{t("general.prepTimeMin")}<Req /></span><input type="number" min={0} {...register("prepTimeMin", { required: true, valueAsNumber: true })} /></label>
+        <label><span className="label-title">{t("general.prepTimeMax")}<Req /></span><input type="number" min={0} {...register("prepTimeMax", { required: true, valueAsNumber: true })} /></label>
+        <label><span className="label-title">{t("restaurants.priceForTwo")}<Req /></span><input type="number" min={0} {...register("priceForTwo", { required: true, valueAsNumber: true })} /></label>
+        <label>{t("general.offerText")}<input placeholder={t("general.offerTextPlaceholder")} {...register("offerText")} /></label>
+        <label>{t("general.offerSubText")}<input placeholder={t("general.offerSubTextPlaceholder")} {...register("offerSubText")} /></label>
+        <label className="property-form-grid__wide"><span className="label-title">{t("common.address")}<Req /></span>
+          <input {...register("addressLine", { required: t("common.addressRequired") })} />
           <FieldError error={errors.addressLine} />
         </label>
-        <label><span className="label-title">City<Req /></span><input {...register("city", { required: "City is required" })} /><FieldError error={errors.city} /></label>
-        <label>State<input {...register("state")} /></label>
-        <label><span className="label-title">Country<Req /></span><input {...register("country", { required: "Country is required" })} /></label>
-        <label>Pincode<input {...register("pincode")} /></label>
-        <label><span className="label-title">Latitude<Req /></span><input type="number" step="0.0000001" {...register("latitude", { required: true, valueAsNumber: true, min: -90, max: 90 })} /></label>
-        <label><span className="label-title">Longitude<Req /></span><input type="number" step="0.0000001" {...register("longitude", { required: true, valueAsNumber: true, min: -180, max: 180 })} /></label>
-        <label><span className="label-title">Phone<Req /></span><PhoneField control={control} name="phone" error={errors.phone} required /></label>
-        <label><span className="label-title">Seating capacity<Req /></span><input type="number" min={1} {...register("seatingCapacity", { required: true, valueAsNumber: true })} /></label>
-        <label><span className="label-title">Max party size<Req /></span><input type="number" min={1} {...register("maxPartySize", { required: true, valueAsNumber: true })} /></label>
+        <label><span className="label-title">{t("common.city")}<Req /></span><input {...register("city", { required: t("common.cityRequired") })} /><FieldError error={errors.city} /></label>
+        <label>{t("general.state")}<input {...register("state")} /></label>
+        <label><span className="label-title">{t("general.country")}<Req /></span><input {...register("country", { required: t("general.countryRequired") })} /></label>
+        <label>{t("general.pincode")}<input {...register("pincode")} /></label>
+        <label><span className="label-title">{t("common.latitude")}<Req /></span><input type="number" step="0.0000001" {...register("latitude", { required: true, valueAsNumber: true, min: -90, max: 90 })} /></label>
+        <label><span className="label-title">{t("common.longitude")}<Req /></span><input type="number" step="0.0000001" {...register("longitude", { required: true, valueAsNumber: true, min: -180, max: 180 })} /></label>
+        <label><span className="label-title">{t("common.phone")}<Req /></span><PhoneField control={control} name="phone" error={errors.phone} required /></label>
+        <label><span className="label-title">{t("restaurants.seatingCapacity")}<Req /></span><input type="number" min={1} {...register("seatingCapacity", { required: true, valueAsNumber: true })} /></label>
+        <label><span className="label-title">{t("restaurants.maxPartySize")}<Req /></span><input type="number" min={1} {...register("maxPartySize", { required: true, valueAsNumber: true })} /></label>
       </div>
       {mutation.error && <div className="form-error">{mutation.error.message}</div>}
       <footer className="settings-form__footer">
-        {saved && <span className="settings-saved">Saved</span>}
-        <Button type="submit" loading={mutation.isPending}><Save size={17} /> Save changes</Button>
+        {saved && <span className="settings-saved">{t("common.saved")}</span>}
+        <Button type="submit" loading={mutation.isPending}><Save size={17} /> {t("common.saveChanges")}</Button>
       </footer>
     </form>
   );

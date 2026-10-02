@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from "../../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
 import { getActiveRestaurantOrThrow } from "./restaurantService.js";
 import { ApiError } from "../utils/http.js";
-import { formatDateOnly, isWithinBookingWindow, parseDateOnly } from "../utils/dates.js";
+import { formatDateOnly, isSlotInPast, isWithinBookingWindow, parseDateOnly } from "../utils/dates.js";
 import { isValidTime12, to12Hour, to24Hour } from "../utils/slotTime.js";
 import type { TablePreference } from "../../generated/prisma/enums.js";
 import { TABLE_PREFERENCE_BY_LABEL } from "../constants/bookingOptions.js";
@@ -74,6 +74,7 @@ export const getAvailableSlots = async (restaurantId: string, dateStr: string, p
   // const tableIdsByTime = new Map<string, Set<string>>();
   // bookedTables.forEach(({ time, tableId }) => { ... });
   const groupsByMeal = new Map<string, { label: string; slots: Array<Record<string, unknown>> }>();
+  const now = new Date();
 
   for (const slot of slotConfigs) {
     const booked = bookedByTime.get(slot.time) ?? 0;
@@ -81,7 +82,8 @@ export const getAvailableSlots = async (restaurantId: string, dateStr: string, p
     // Table booking disabled — availability is purely seat-capacity based.
     // const freeTables = tables.filter((table) => table.capacity >= people && (preference === "ANY" || table.preference === preference) && !tableIdsByTime.get(slot.time)?.has(table.id));
     // const available = tables.length ? freeTables.length > 0 : seatsLeft >= people;
-    const available = seatsLeft >= people;
+    // Slots whose start time has already passed (earlier today) can't be booked.
+    const available = !isSlotInPast(date, slot.time, now) && seatsLeft >= people;
 
     const group = groupsByMeal.get(slot.meal) ?? { label: mealLabel(slot.meal), slots: [] };
     group.slots.push({ time: to12Hour(slot.time), available, seatsLeft: available ? seatsLeft : undefined });
@@ -116,6 +118,9 @@ export const getTableAvailability = async (restaurantId: string, dateStr: string
     throw new ApiError(422, "people must be a positive integer.");
   }
   const time = to24Hour(time12);
+  if (isSlotInPast(date, time)) {
+    throw new ApiError(422, "This slot time has already passed.");
+  }
   const preference = preferenceLabel ? TABLE_PREFERENCE_BY_LABEL[preferenceLabel] : "ANY";
 
   const [tables, bookedTables] = await Promise.all([

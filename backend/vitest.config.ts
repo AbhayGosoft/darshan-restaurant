@@ -7,5 +7,7 @@ export default defineConfig({
     globals: false,
     hookTimeout: 30000,
     testTimeout: 15000,
+    // Existing fixtures build slot instants in UTC; timezone-specific behaviour is tested explicitly.
+    env: { BUSINESS_TIMEZONE: "UTC" },
   },
 });

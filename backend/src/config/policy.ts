@@ -14,6 +14,8 @@ export const policy = {
   bookingAdvanceInr: env.restaurantBookingAdvanceInr,
   /** Furthest a customer may book ahead. */
   maxBookingLeadDays: 60,
+  /** IANA timezone slot times are expressed in (restaurant wall-clock time). */
+  businessTimeZone: env.businessTimeZone,
 };
 
 export type RefundDecision = { eligible: boolean; amount: number };

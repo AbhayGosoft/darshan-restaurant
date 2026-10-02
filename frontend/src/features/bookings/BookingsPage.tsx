@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CalendarDays, Phone, Users, X } from "lucide-react";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api-client";
 import { queryClient } from "@/lib/query-client";
 import { useAppStore } from "@/store/app-store";
@@ -10,14 +12,11 @@ import { Button } from "@/components/ui/Button";
 import { LoadingGrid, StateView } from "@/components/ui/StateView";
 import { ResourceDialog, ResourceToolbar } from "@/components/resource/dialog-kit";
 
-const STATUS_OPTIONS = [
-  { value: "", label: "All statuses" },
-  { value: "upcoming", label: "Upcoming" },
-  { value: "past", label: "Past" },
-  { value: "cancelled", label: "Cancelled" },
-];
+const STATUSES = ["upcoming", "past", "cancelled"] as const;
 
-const CANCEL_REASONS = ["Change of plans", "Booked by mistake", "Found a better option", "Restaurant not responding", "Other"];
+// Values are sent to the API as-is (it validates these English labels); only the display text is translated.
+const CANCEL_REASONS = ["Change of plans", "Booked by mistake", "Found a better option", "Restaurant not responding", "Other"] as const;
+const CANCEL_REASON_KEYS = Object.fromEntries(CANCEL_REASONS.map((reason) => [reason, true]));
 
 export function BookingsPage() {
   const restaurantId = useAppStore((state) => state.activeRestaurant?.id);
@@ -25,7 +24,22 @@ export function BookingsPage() {
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<RestaurantBooking | null>(null);
-  const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0]);
+  const [cancelReason, setCancelReason] = useState<string>(CANCEL_REASONS[0]);
+  const { t } = useTranslation();
+  // Deep link from the header bell: /bookings?booking=<id> opens that booking's detail.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedBookingId = searchParams.get("booking");
+  const linkedBooking = useQuery({
+    queryKey: ["admin-booking", linkedBookingId],
+    queryFn: () => api<RestaurantBooking>(`/admin/bookings/${linkedBookingId}`),
+    enabled: Boolean(linkedBookingId),
+  });
+  useEffect(() => {
+    if (!linkedBooking.data) return;
+    setSelected(linkedBooking.data);
+    setSearchParams({}, { replace: true });
+  }, [linkedBooking.data, setSearchParams]);
+  const statusOptions = [{ value: "", label: t("bookings.allStatuses") }, ...STATUSES.map((value) => ({ value, label: t(`bookings.status.${value}`) }))];
 
   const query = useQuery({
     queryKey: ["admin-bookings", restaurantId, status, page, isSuperAdmin],
@@ -48,7 +62,7 @@ export function BookingsPage() {
   return (
     <main className="page">
       <section className="resource-head">
-        <span className="eyebrow"><CalendarDays size={14} /> Bookings</span>
+        <span className="eyebrow"><CalendarDays size={14} /> {t("bookings.title")}</span>
       </section>
 
       <ResourceToolbar
@@ -57,19 +71,19 @@ export function BookingsPage() {
         placeholder=""
         filter={status}
         onFilterChange={(value) => { setStatus(value); setPage(1); }}
-        filterOptions={STATUS_OPTIONS}
+        filterOptions={statusOptions}
       />
 
       {query.isLoading && <LoadingGrid />}
-      {query.isError && <StateView title="Couldn't load bookings" message="Check the backend connection and try once more." action={() => void query.refetch()} />}
-      {query.isSuccess && !bookings.length && <StateView title="No bookings found" message="Bookings will show up here once customers start placing orders." />}
+      {query.isError && <StateView title={t("bookings.loadError")} message={t("common.loadErrorMessage")} action={() => void query.refetch()} />}
+      {query.isSuccess && !bookings.length && <StateView title={t("bookings.emptyTitle")} message={t("bookings.emptyMessage")} />}
 
       {bookings.length > 0 && (
         <div className="table-scroll">
           <table className="data-table">
             <thead>
               {/* Table booking disabled — the Table column is replaced by the ordered items count. */}
-              <tr><th>Booking</th><th>Guest</th><th>Date &amp; time</th><th>Items</th><th>People</th><th>Status</th><th>Paid</th></tr>
+              <tr><th>{t("bookings.columns.booking")}</th><th>{t("bookings.columns.guest")}</th><th>{t("bookings.columns.dateTime")}</th><th>{t("bookings.columns.items")}</th><th>{t("bookings.columns.people")}</th><th>{t("bookings.columns.status")}</th><th>{t("bookings.columns.paid")}</th></tr>
             </thead>
             <tbody>
               {bookings.map((booking) => (
@@ -80,7 +94,7 @@ export function BookingsPage() {
                   {/* <td>{booking.table?.name ?? "Auto/capacity"}</td> */}
                   <td>{booking.preorder?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0}</td>
                   <td>{booking.people}</td>
-                  <td><span className={clsx("badge", `badge--${booking.status}`)}>{booking.status}</span></td>
+                  <td><span className={clsx("badge", `badge--${booking.status}`)}>{t(`bookings.status.${booking.status}`)}</span></td>
                   <td>₹{booking.advancePaid}</td>
                 </tr>
               ))}
@@ -91,34 +105,34 @@ export function BookingsPage() {
 
       {query.data && query.data.pagination.totalPages > 1 && (
         <div className="pagination-row">
-          <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
-          <span>Page {page} of {query.data.pagination.totalPages}</span>
-          <Button type="button" variant="secondary" disabled={!query.data.pagination.hasNextPage} onClick={() => setPage((p) => p + 1)}>Next</Button>
+          <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>{t("bookings.previous")}</Button>
+          <span>{t("bookings.pageOf", { page, total: query.data.pagination.totalPages })}</span>
+          <Button type="button" variant="secondary" disabled={!query.data.pagination.hasNextPage} onClick={() => setPage((p) => p + 1)}>{t("bookings.next")}</Button>
         </div>
       )}
 
       {selected && (
-        <ResourceDialog title={selected.humanBookingId} eyebrow="Booking details" onClose={() => setSelected(null)}>
+        <ResourceDialog title={selected.humanBookingId} eyebrow={t("bookings.details")} onClose={() => setSelected(null)}>
           <div className="booking-detail-body">
-            <div className="booking-detail-row"><Users size={16} /> {selected.fullName} · {selected.people} people</div>
+            <div className="booking-detail-row"><Users size={16} /> {selected.fullName} · {t("common.people", { count: selected.people })}</div>
             <div className="booking-detail-row"><Phone size={16} /> {selected.mobileNumber}</div>
-            <div className="booking-detail-row"><CalendarDays size={16} /> {selected.date} at {selected.time}</div>
+            <div className="booking-detail-row"><CalendarDays size={16} /> {t("common.dateAtTime", { date: selected.date, time: selected.time })}</div>
             {/* Table booking disabled:
             <div className="booking-detail-row">Table preference: <strong>{selected.tablePreference}</strong></div>
             {selected.table && <div className="booking-detail-row">Assigned table: <strong>{selected.table.name}</strong>{selected.table.section ? ` · ${selected.table.section}` : ""}</div>} */}
-            {selected.preorder && <div className="booking-detail-row">Ordered items: <strong>₹{selected.preorder.total}</strong><br />{selected.preorder.items.map((item) => <span key={item.id}>{item.quantity}× {item.name} · ₹{item.lineTotal}<br /></span>)}</div>}
-            {selected.specialRequest && <div className="booking-detail-row">Special request: {selected.specialRequest}</div>}
-            <div className="booking-detail-row">Amount paid: <strong>₹{selected.advancePaid}</strong></div>
-            <div className="booking-detail-row">Status: <span className={clsx("badge", `badge--${selected.status}`)}>{selected.status}</span></div>
-            {selected.cancellationReason && <div className="booking-detail-row">Cancellation reason: {selected.cancellationReason}</div>}
-            {selected.refund && <div className="booking-detail-row">Refund: {selected.refund.eligible ? `₹${selected.refund.amount} eligible` : "Not eligible"}</div>}
+            {selected.preorder && <div className="booking-detail-row">{t("bookings.orderedItems")}: <strong>₹{selected.preorder.total}</strong><br />{selected.preorder.items.map((item) => <span key={item.id}>{item.quantity}× {item.name} · ₹{item.lineTotal}<br /></span>)}</div>}
+            {selected.specialRequest && <div className="booking-detail-row">{t("bookings.specialRequest")}: {selected.specialRequest}</div>}
+            <div className="booking-detail-row">{t("bookings.amountPaid")}: <strong>₹{selected.advancePaid}</strong></div>
+            <div className="booking-detail-row">{t("bookings.statusLabel")}: <span className={clsx("badge", `badge--${selected.status}`)}>{t(`bookings.status.${selected.status}`)}</span></div>
+            {selected.cancellationReason && <div className="booking-detail-row">{t("bookings.cancellationReason")}: {selected.cancellationReason in CANCEL_REASON_KEYS ? t(`bookings.cancelReasons.${selected.cancellationReason as (typeof CANCEL_REASONS)[number]}`) : selected.cancellationReason}</div>}
+            {selected.refund && <div className="booking-detail-row">{t("bookings.refund")}: {selected.refund.eligible ? t("bookings.refundEligible", { amount: selected.refund.amount }) : t("bookings.refundNotEligible")}</div>}
 
             {selected.status === "upcoming" && (
               <div className="booking-cancel-row">
                 <select value={cancelReason} onChange={(event) => setCancelReason(event.target.value)}>
-                  {CANCEL_REASONS.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
+                  {CANCEL_REASONS.map((reason) => <option key={reason} value={reason}>{t(`bookings.cancelReasons.${reason}`)}</option>)}
                 </select>
-                <Button type="button" variant="ghost" loading={cancel.isPending} onClick={() => cancel.mutate(selected.id)}><X size={15} /> Cancel booking</Button>
+                <Button type="button" variant="ghost" loading={cancel.isPending} onClick={() => cancel.mutate(selected.id)}><X size={15} /> {t("bookings.cancelBooking")}</Button>
               </div>
             )}
             {cancel.error && <div className="form-error">{cancel.error.message}</div>}

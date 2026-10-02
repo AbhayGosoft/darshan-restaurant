@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { ArrowRight, Pencil, Plus, ShieldCheck, Trash2, UserCog } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { queryClient } from "@/lib/query-client";
@@ -15,6 +16,7 @@ import { CheckboxList, ConfirmDialog, DialogFooter, FieldError, Notice, Resource
 type AdminForm = { name: string; email: string; password: string; role: "ADMIN" | "SUPERADMIN"; isActive: boolean };
 
 export function AdminsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const selectAdmin = useAppStore((state) => state.selectAdmin);
   const admins = useQuery({ queryKey: ["admins"], queryFn: () => api<AdminUser[]>("/admin/admins") });
@@ -59,7 +61,7 @@ export function AdminsPage() {
   };
 
   if (admins.isLoading) return <main className="page"><LoadingGrid /></main>;
-  if (admins.isError) return <main className="page"><StateView title="Couldn't load admins" message="Check the backend connection and try once more." action={() => void admins.refetch()} /></main>;
+  if (admins.isError) return <main className="page"><StateView title={t("admins.loadError")} message={t("common.loadErrorMessage")} action={() => void admins.refetch()} /></main>;
 
   const listed = (admins.data ?? []).filter((admin) => admin.role === "ADMIN");
   const activeAdmins = listed.filter((admin) => admin.status === "ACTIVE");
@@ -69,30 +71,30 @@ export function AdminsPage() {
   return (
     <main className="page">
       <section className="resource-head">
-        <span className="eyebrow"><UserCog size={14} /> Admins</span>
-        <Button type="button" onClick={openNew}><Plus size={17} /> Add admin</Button>
+        <span className="eyebrow"><UserCog size={14} /> {t("admins.title")}</span>
+        <Button type="button" onClick={openNew}><Plus size={17} /> {t("admins.add")}</Button>
       </section>
 
       <StatusTabs value={view} onChange={setView} activeCount={activeAdmins.length} inactiveCount={inactiveAdmins.length} />
       {notice && <Notice message={notice} onClose={() => setNotice("")} />}
       {!visible.length ? (
-        <StateView title={view === "active" ? "No active admins" : "No deactivated admins"} message={view === "active" ? "Add an admin to manage restaurants." : "Admins marked inactive in the edit form show up here."} />
+        <StateView title={view === "active" ? t("admins.noActiveTitle") : t("admins.noDeactivatedTitle")} message={view === "active" ? t("admins.noActiveMessage") : t("admins.noDeactivatedMessage")} />
       ) : (
       <div className="table-scroll">
         <table className="data-table">
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Restaurants</th><th>Status</th><th /></tr></thead>
+          <thead><tr><th>{t("admins.columns.name")}</th><th>{t("admins.columns.email")}</th><th>{t("admins.columns.role")}</th><th>{t("admins.columns.restaurants")}</th><th>{t("admins.columns.status")}</th><th /></tr></thead>
           <tbody>
             {visible.map((admin) => (
               <tr key={admin.id} className={admin.role === "ADMIN" ? "data-table__row" : undefined} onClick={admin.role === "ADMIN" ? () => enter(admin) : undefined}>
                 <td>{admin.name}</td>
                 <td>{admin.email}</td>
-                <td>{admin.role === "SUPERADMIN" ? <span className="badge"><ShieldCheck size={12} /> SuperAdmin</span> : "Admin"}</td>
+                <td>{admin.role === "SUPERADMIN" ? <span className="badge"><ShieldCheck size={12} /> {t("common.superAdmin")}</span> : t("common.admin")}</td>
                 <td>{(admin.restaurants ?? []).map((r) => r.restaurant.name).join(", ") || "—"}</td>
-                <td><span className={`badge badge--${admin.status.toLowerCase()}`}>{admin.status}</span></td>
+                <td><span className={`badge badge--${admin.status.toLowerCase()}`}>{t(`common.recordStatus.${admin.status}`)}</span></td>
                 <td>
-                  <button type="button" className="icon-button" aria-label="Edit admin" onClick={(event) => { event.stopPropagation(); openEdit(admin); }}><Pencil size={15} /></button>
-                  <button type="button" className="icon-button icon-button--danger" aria-label="Delete admin permanently" title="Delete permanently" onClick={(event) => { event.stopPropagation(); remove.reset(); setAdminToDelete(admin); }}><Trash2 size={15} /></button>
-                  {admin.role === "ADMIN" && <button type="button" className="icon-button" aria-label={`View ${admin.name}'s restaurants`} onClick={(event) => { event.stopPropagation(); enter(admin); }}><ArrowRight size={15} /></button>}
+                  <button type="button" className="icon-button" aria-label={t("admins.editAria")} onClick={(event) => { event.stopPropagation(); openEdit(admin); }}><Pencil size={15} /></button>
+                  <button type="button" className="icon-button icon-button--danger" aria-label={t("admins.deleteAria")} title={t("common.deletePermanently")} onClick={(event) => { event.stopPropagation(); remove.reset(); setAdminToDelete(admin); }}><Trash2 size={15} /></button>
+                  {admin.role === "ADMIN" && <button type="button" className="icon-button" aria-label={t("admins.viewRestaurantsAria", { name: admin.name })} onClick={(event) => { event.stopPropagation(); enter(admin); }}><ArrowRight size={15} /></button>}
                 </td>
               </tr>
             ))}
@@ -102,29 +104,29 @@ export function AdminsPage() {
       )}
 
       {dialog && (
-        <ResourceDialog title={dialog === "new" ? "Add admin" : "Edit admin"} eyebrow="Admin account" onClose={() => setDialog(null)}>
+        <ResourceDialog title={dialog === "new" ? t("admins.add") : t("admins.edit")} eyebrow={t("admins.eyebrow")} onClose={() => setDialog(null)}>
           <form noValidate onSubmit={handleSubmit((data) => save.mutate(data))}>
             <div className="property-form-grid">
-              <label><span className="label-title">Name<Req /></span><input {...register("name", { required: "Name is required" })} /><FieldError error={errors.name} /></label>
-              <label><span className="label-title">Email<Req /></span><input type="email" disabled={dialog !== "new"} {...register("email", { required: "Email is required" })} /><FieldError error={errors.email} /></label>
-              <label><span className="label-title">{dialog === "new" ? <>Password<Req /></> : "New password (optional)"}</span>
-                <PasswordInput placeholder={dialog === "new" ? "Set a password" : "Leave blank to keep current password"} {...register("password", { required: dialog === "new" ? "Password is required" : false, minLength: { value: 8, message: "Use at least 8 characters" } })} />
+              <label><span className="label-title">{t("common.name")}<Req /></span><input {...register("name", { required: t("common.nameRequired") })} /><FieldError error={errors.name} /></label>
+              <label><span className="label-title">{t("common.email")}<Req /></span><input type="email" disabled={dialog !== "new"} {...register("email", { required: t("admins.emailRequired") })} /><FieldError error={errors.email} /></label>
+              <label><span className="label-title">{dialog === "new" ? <>{t("admins.password")}<Req /></> : t("admins.newPasswordOptional")}</span>
+                <PasswordInput placeholder={dialog === "new" ? t("admins.setPassword") : t("admins.keepPassword")} {...register("password", { required: dialog === "new" ? t("admins.passwordRequired") : false, minLength: { value: 8, message: t("common.minPasswordLength") } })} />
                 <FieldError error={errors.password} />
               </label>
-              <label>Role<select {...register("role")}><option value="ADMIN">Admin</option><option value="SUPERADMIN">SuperAdmin</option></select></label>
+              <label>{t("admins.role")}<select {...register("role")}><option value="ADMIN">{t("common.admin")}</option><option value="SUPERADMIN">{t("common.superAdmin")}</option></select></label>
               {dialog !== "new" && (
-                <label className="check-option"><input type="checkbox" {...register("isActive")} /><span>Active</span></label>
+                <label className="check-option"><input type="checkbox" {...register("isActive")} /><span>{t("common.active")}</span></label>
               )}
               {restaurants.data && (
-                <CheckboxList title="Assigned restaurants" items={restaurants.data.restaurants.map((r) => ({ id: r.id, label: r.name }))} selected={selectedRestaurantIds} onChange={setSelectedRestaurantIds} />
+                <CheckboxList title={t("admins.assignedRestaurants")} items={restaurants.data.restaurants.map((r) => ({ id: r.id, label: r.name }))} selected={selectedRestaurantIds} onChange={setSelectedRestaurantIds} />
               )}
             </div>
             {save.error && <div className="form-error">{save.error.message}</div>}
-            <DialogFooter onClose={() => setDialog(null)} loading={save.isPending} label={dialog === "new" ? "Add admin" : "Save changes"} />
+            <DialogFooter onClose={() => setDialog(null)} loading={save.isPending} label={dialog === "new" ? t("admins.add") : t("common.saveChanges")} />
           </form>
         </ResourceDialog>
       )}
-      {adminToDelete && <ConfirmDialog title="Delete admin permanently?" message={`${adminToDelete.name}'s account and restaurant assignments will be removed. This cannot be undone.`} confirmLabel="Delete permanently" danger loading={remove.isPending} error={remove.error?.message} onClose={() => setAdminToDelete(null)} onConfirm={() => remove.mutate(adminToDelete)} />}
+      {adminToDelete && <ConfirmDialog title={t("admins.deleteTitle")} message={t("admins.deleteMessage", { name: adminToDelete.name })} confirmLabel={t("common.deletePermanently")} danger loading={remove.isPending} error={remove.error?.message} onClose={() => setAdminToDelete(null)} onConfirm={() => remove.mutate(adminToDelete)} />}
     </main>
   );
 }

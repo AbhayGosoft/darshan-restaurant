@@ -73,6 +73,11 @@ export const verifyPayment = async (
     throw new ApiError(400, "Invalid payment signature");
   }
 
+  // razorpay_payment_id is unique; a reused id (e.g. the same test id sent for a second mock order)
+  // would otherwise surface as an opaque 500 from the DB constraint.
+  const alreadyUsed = await prisma.payment.findUnique({ where: { razorpayPaymentId: input.razorpay_payment_id } });
+  if (alreadyUsed) throw new ApiError(409, "This razorpay_payment_id has already been used for another order");
+
   const verified = await prisma.payment.update({
     where: { id: payment.id },
     data: {

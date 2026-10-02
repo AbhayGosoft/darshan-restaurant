@@ -1,7 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Noto+Sans+Gujarati:wght@400;500;600;700;800&display=swap");
 
 :root {
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: "DM Sans", "Noto Sans Devanagari", "Noto Sans Gujarati", system-ui, sans-serif;
   color: #07133a;
   background: #f8f6f0;
   font-synthesis: none;
@@ -25,7 +25,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 h1, h2, h3, p { margin-top: 0; }
-h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
+h1, h2, h3, .brand { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; }
 
 .brand { display: flex; align-items: center; gap: 11px; font-size: 20px; font-weight: 800; letter-spacing: -.5px; }
 .brand__mark { display: grid; place-items: center; width: 39px; height: 39px; border-radius: 13px; color: white; background: var(--brand); box-shadow: 0 8px 20px rgba(255,127,34,.24); }
@@ -231,7 +231,7 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .topbar { height: 76px; padding: 0 clamp(24px,4vw,54px); background: rgba(255,255,255,.92); border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 20; backdrop-filter: blur(12px); }
 .topbar > div { display: flex; align-items: center; gap: 12px; }
 .topbar small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .8px; }
-.topbar strong { font-family: "Manrope"; font-size: 15px; margin-top: 2px; }
+.topbar strong { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 15px; margin-top: 2px; }
 .icon-button { border: 0; width: 40px; height: 40px; padding: 0; background: transparent; display: grid; place-items: center; border-radius: 12px; color: var(--ink); }
 .icon-button:hover { background: #eef3ef; }
 .notification-button { position: relative; }
@@ -264,7 +264,7 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .tone-green { color: #0b624f; background: #e6f5ef; }.tone-violet { color: #07133a; background: #e9edfb; }.tone-orange { color: #ff7f22; background: #fff0e4; }.tone-blue { color: #0b1d54; background: #e9edfb; }
 .metric-card > div { min-width: 0; display: flex; flex-direction: column; }
 .metric-card small { color: var(--muted); font-size: 12px; }
-.metric-card strong { color: var(--ink); font-family: "Manrope"; font-size: 25px; letter-spacing: -.8px; margin: 6px 0 4px; }
+.metric-card strong { color: var(--ink); font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 25px; letter-spacing: -.8px; margin: 6px 0 4px; }
 .metric-card span:not(.metric-card__icon) { color: #85918e; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, .8fr); gap: 18px; margin-top: 18px; }
 .panel { background: white; border: 1px solid var(--line); border-radius: 20px; padding: 24px; box-shadow: var(--shadow); }
@@ -275,12 +275,12 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .booking-row { display: grid; grid-template-columns: 47px minmax(120px,1fr) auto auto; gap: 14px; align-items: center; padding: 13px 0; border-top: 1px solid #edf0ed; }
 .booking-row:first-child { border-top: 0; }
 .date-tile { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 45px; height: 48px; border-radius: 12px; color: var(--brand); background: var(--brand-pale); line-height: 1; }
-.date-tile strong { font-family: "Manrope"; font-size: 17px; }
+.date-tile strong { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 17px; }
 .date-tile small { font-size: 9px; margin-top: 4px; text-transform: uppercase; }
 .booking-row__main { display: flex; flex-direction: column; min-width: 0; }
 .booking-row__main strong { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .booking-row__main small { color: var(--muted); font-size: 11px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.booking-amount { font-family: "Manrope"; font-size: 13px; }
+.booking-amount { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 13px; }
 .status { display: inline-flex; align-items: center; justify-content: center; width: fit-content; border-radius: 999px; padding: 6px 9px; font-size: 9px; line-height: 1; letter-spacing: .4px; font-weight: 800; }
 .status--confirmed, .status--active, .status--available { color: #187764; background: #e2f3ed; }
 .status--pending, .status--reserved { color: #9b672e; background: #fff1db; }
@@ -336,8 +336,8 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .resource-card__line2 { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--muted); font-size: 12px; }
 .resource-card__line2 span:not(.dot) { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .resource-card__line2 .dot { flex: 0 0 auto; opacity: .55; }
-.resource-card__value { flex: 0 0 auto; color: var(--ink); font-family: "Manrope"; font-size: 15px; text-align: right; }
-.resource-card__value small { display: block; margin-top: 2px; color: var(--muted); font-family: "DM Sans"; font-size: 10px; font-weight: 500; }
+.resource-card__value { flex: 0 0 auto; color: var(--ink); font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 15px; text-align: right; }
+.resource-card__value small { display: block; margin-top: 2px; color: var(--muted); font-family: "DM Sans", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 10px; font-weight: 500; }
 .resource-card__chevron { flex: 0 0 auto; color: #c3cad6; }
 .property-edit-button { flex: 0 0 auto; padding: 7px 9px; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 10px; color: var(--brand); background: var(--brand-pale); font-size: 11px; font-weight: 700; }
 .property-edit-button:hover { background: #d4ebe5; }
@@ -380,7 +380,7 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .booking-detail__hero > div { min-width: 0; }
 .booking-detail__hero h3 { margin: 14px 0 6px; font-size: 27px; letter-spacing: -.8px; }
 .booking-detail__hero p { margin: 0; color: #cdd6f0; overflow-wrap: anywhere; }
-.booking-detail__hero > strong { flex: 0 1 auto; min-width: 0; font-family: "Manrope"; font-size: 27px; letter-spacing: -.7px; text-align: right; overflow-wrap: anywhere; }
+.booking-detail__hero > strong { flex: 0 1 auto; min-width: 0; font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 27px; letter-spacing: -.7px; text-align: right; overflow-wrap: anywhere; }
 .booking-highlight-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
 .booking-highlight { min-width: 0; padding: 14px; display: grid; gap: 7px; border-radius: 14px; }
 .booking-highlight > span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; background: rgba(255,255,255,.72); }
@@ -411,7 +411,7 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .booking-line-item > div:first-child { min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; }
 .booking-line-item strong { min-width: 0; color: var(--ink); font-size: 12.5px; overflow-wrap: anywhere; }
 .booking-line-item small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
-.booking-line-item__value { flex: 0 0 auto; font-family: "Manrope"; }
+.booking-line-item__value { flex: 0 0 auto; font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; }
 .booking-line-item__actions { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; }
 .booking-line-item__actions button { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; color: var(--muted); background: #f3f5f3; font-weight: 700; }
 .booking-line-item__actions button:hover { background: #e7ebe7; color: var(--ink); }
@@ -545,7 +545,7 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .workspace-context { display: flex; flex-direction: column; gap: 2px; }
 .workspace-context__crumb { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; font-weight: 700; }
 .workspace-context__crumb svg { color: #c3cad6; }
-.workspace-context__crumb strong { color: var(--ink); font-family: "Manrope"; font-size: 15px; font-weight: 800; }
+.workspace-context__crumb strong { color: var(--ink); font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 15px; font-weight: 800; }
 .workspace-context small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .8px; }
 .context-action { position: relative; width: 40px; height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 11px; color: #53615d; background: white; font-size: 12px; font-weight: 700; white-space: nowrap; transition: background .18s, border-color .18s, color .18s, box-shadow .18s; }
 .context-action:hover, .context-action:focus-visible { color: var(--brand); border-color: #ffd9bc; background: #fff8f2; }
@@ -602,11 +602,11 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .tax-summary-card h3 { font-size: 16px; margin: 0; }
 .tax-summary-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; background: var(--line); border-radius: 12px; overflow: hidden; }
 .tax-summary-card li { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: white; font-size: 13px; }
-.tax-summary-card li strong { font-family: "Manrope"; }
+.tax-summary-card li strong { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; }
 
 .report-bar-chart { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: end; gap: 14px; height: 220px; padding-top: 30px; }
 .report-bar-chart__col { min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 8px; }
-.report-bar-chart__value { color: var(--ink); font-family: "Manrope"; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.report-bar-chart__value { color: var(--ink); font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .report-bar-chart__bar { width: 100%; max-width: 46px; min-height: 6px; border-radius: 8px 8px 3px 3px; background: linear-gradient(180deg, var(--brand), var(--brand-dark)); }
 .report-bar-chart__col small { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .report-status-list { display: grid; gap: 14px; }
@@ -620,7 +620,7 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .report-status-row__fill.status--cancelled, .report-status-row__fill.status--rejected, .report-status-row__fill.status--auto_cancelled { background: #b14d4d; }
 .report-status-row__fill.status--completed { background: #526a9c; }
 .report-status-row__fill.status--expired { background: #8a8f8d; }
-.report-status-row strong { text-align: right; font-family: "Manrope"; }
+.report-status-row strong { text-align: right; font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; }
 
 .inventory-toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
 .inventory-toolbar h2 { min-width: 190px; text-align: center; font-size: 18px; letter-spacing: -.4px; margin: 0; }
@@ -637,7 +637,7 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .inventory-day--low { background: #fff9ee; }
 .inventory-day--full { background: #fdf2f2; }
 .inventory-day__top { width: 100%; display: flex; align-items: center; justify-content: space-between; }
-.inventory-day__number { color: var(--ink); font-family: "Manrope"; font-weight: 800; font-size: 14px; }
+.inventory-day__number { color: var(--ink); font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-weight: 800; font-size: 14px; }
 .inventory-day__dot { display: inline-block; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; }
 .inventory-day__dot--available { background: #1c9c72; }
 .inventory-day__dot--low { background: #d99a2b; }
@@ -658,10 +658,10 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .inventory-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
 .inventory-stat { min-width: 0; padding: 16px; display: flex; gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: 15px; background: white; }
 .inventory-stat small { display: block; color: var(--muted); font-size: 11px; }
-.inventory-stat strong { display: block; margin-top: 3px; font-family: "Manrope"; font-size: 20px; }
+.inventory-stat strong { display: block; margin-top: 3px; font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 20px; }
 .inventory-source-grid { margin-top: 14px; display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: var(--line); }
 .inventory-source-stat { display: flex; justify-content: space-between; padding: 12px 14px; background: #fafcfb; font-size: 13px; }
-.inventory-source-stat strong { font-family: "Manrope"; }
+.inventory-source-stat strong { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; }
 .inventory-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
 .inventory-actions .button { width: 100%; }
 
@@ -844,12 +844,12 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin: 20px 0; }
 .stat-card { display: flex; align-items: center; gap: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 17px; background: white; box-shadow: var(--shadow); }
 .stat-card svg { padding: 10px; width: 40px; height: 40px; border-radius: 12px; color: var(--brand); background: var(--brand-pale); box-sizing: border-box; }
-.stat-card strong { display: block; font-family: "Manrope"; font-size: 22px; }
+.stat-card strong { display: block; font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 22px; }
 .stat-card small { color: var(--muted); font-size: 12px; }
 
 .restaurant-hero-card { display: flex; align-items: center; gap: 16px; padding: 18px; margin-bottom: 6px; border: 1px solid var(--line); border-radius: 17px; background: white; box-shadow: var(--shadow); }
 .restaurant-hero-card img { width: 84px; height: 84px; border-radius: 13px; object-fit: cover; }
-.restaurant-hero-card strong { display: block; font-family: "Manrope"; font-size: 18px; }
+.restaurant-hero-card strong { display: block; font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 18px; }
 .restaurant-hero-card small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
 
 .restaurant-picker-card { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px; border: 1px solid var(--line); border-radius: 17px; background: white; box-shadow: var(--shadow); text-align: left; position: relative; transition: transform .15s, box-shadow .15s; }
@@ -865,7 +865,7 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 
 .menu-category-list { display: flex; flex-direction: column; gap: 16px; }
 .menu-category-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-.menu-category-card__head strong { font-family: "Manrope"; font-size: 16px; }
+.menu-category-card__head strong { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans Gujarati", sans-serif; font-size: 16px; }
 .menu-category-card__actions { display: flex; align-items: center; gap: 6px; }
 .menu-item-list { display: flex; flex-direction: column; gap: 10px; }
 .menu-item-row { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 13px; }
@@ -904,3 +904,67 @@ h1, h2, h3, .brand { font-family: "Manrope", sans-serif; }
 .button.button--danger { color: white; background: #b94040; }
 .button.button--danger:hover:not(:disabled) { background: #9f3737; }
 .inactive-section-title { margin: 8px 0 12px; font-size: 13px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: .4px; }
+
+/* --- Language switcher + multi-script text --- */
+.language-select { position: relative; }
+.language-select__trigger { width: 100%; min-height: 42px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 11px; background: white; color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; transition: background .18s, border-color .18s, box-shadow .18s; }
+.language-select__trigger > svg:first-child { flex: 0 0 auto; color: #53615d; }
+.language-select__trigger > span { flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.language-select__trigger:hover { background: #f3f5f3; }
+.language-select__trigger:focus-visible { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(255,127,34,.12); }
+.language-select__chevron { flex: 0 0 auto; color: var(--muted); transition: transform .18s; }
+.language-select--open .language-select__chevron { transform: rotate(180deg); }
+.language-select--compact .language-select__trigger { min-height: 40px; width: auto; max-width: 170px; }
+.language-select__panel { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; min-width: 100%; width: max-content; max-width: min(260px, calc(100vw - 32px)); max-height: 300px; overflow-y: auto; padding: 6px; border: 1px solid rgba(233,227,216,.8); border-radius: 14px; background: white; box-shadow: 0 2px 8px rgba(7,19,58,.04), 0 16px 40px rgba(7,19,58,.12); }
+.language-select__option { width: 100%; min-height: 40px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 0; border-radius: 9px; background: transparent; color: var(--ink); font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.language-select__option:hover, .language-select__option:focus-visible { outline: 0; background: #f3f5f3; }
+.language-select__option.active { color: var(--brand); background: var(--brand-pale); }
+.language-select__option svg { flex: 0 0 auto; }
+/* The avatar menu styles every <button> inside it; undo that for the embedded language picker. */
+.avatar-menu__panel .language-select__trigger { width: 100%; margin: 0; padding: 0 12px; gap: 8px; border-radius: 11px; font-size: 13px; font-weight: 700; color: var(--ink); border: 1px solid var(--line); }
+.avatar-menu__panel .language-select__trigger:hover { transform: none; color: var(--ink); background: #f3f5f3; }
+.avatar-menu__panel .language-select__option { width: 100%; margin: 0; padding: 0 12px; gap: 16px; border-radius: 9px; font-size: 14px; color: var(--ink); }
+.avatar-menu__panel .language-select__option:hover { transform: none; color: var(--ink); background: #f3f5f3; }
+.avatar-menu__panel .language-select__option.active { color: var(--brand); background: var(--brand-pale); }
+.avatar-menu__panel .language-select__panel { position: static; width: 100%; max-width: none; margin-top: 6px; box-shadow: none; }
+.avatar-menu__language { display: flex; flex-direction: column; gap: 6px; padding: 10px 6px 8px; border-bottom: 1px solid #eef2f7; margin-bottom: 4px; }
+.avatar-menu__language small { color: #7b8794; font-size: 11px; font-weight: 700; }
+.login-language { margin-bottom: 28px; }
+/* Wide screens: language lives in the topbar. Narrow screens: the topbar has no room, so it moves into the avatar menu. */
+.avatar-menu__language { display: none; }
+@media (max-width: 820px) {
+  .topbar-language { display: none; }
+  .avatar-menu__language { display: flex; }
+}
+/* Devanagari/Gujarati matras sit above and below the line; tight Latin line-heights clip them. */
+html:lang(hi) body, html:lang(gu) body { line-height: 1.6; }
+html:lang(hi) :is(h1, h2, h3), html:lang(gu) :is(h1, h2, h3) { line-height: 1.35; letter-spacing: 0; }
+html:lang(hi) .eyebrow, html:lang(gu) .eyebrow { letter-spacing: 0; text-transform: none; line-height: 1.4; }
+.status-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.status-tabs::-webkit-scrollbar { display: none; }
+.status-tab { flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 590px) {
+  /* Translated labels run longer than English; let them wrap instead of overflowing the screen. */
+  .button { white-space: normal; text-align: center; line-height: 1.3; }
+  .property-dialog footer { flex-wrap: wrap; }
+  .confirm-dialog footer .button { flex: 1 1 auto; }
+  .status-tabs { display: flex; width: 100%; }
+  .status-tab { flex: 1 0 auto; justify-content: center; }
+}
+
+/* --- Header notification bell --- */
+.notification-bell { position: relative; }
+.notification-bell__trigger { position: relative; }
+.notification-bell__trigger.active { border-color: var(--brand); color: var(--brand); background: var(--brand-pale); }
+.notification-bell__badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; display: grid; place-items: center; border: 2px solid white; border-radius: 999px; background: #e5484d; color: white; font-size: 10px; font-weight: 800; line-height: 1; }
+.notification-bell__panel { position: absolute; top: calc(100% + 10px); right: 0; z-index: 40; overflow: hidden; border: 1px solid rgba(233,227,216,.8); border-radius: 16px; background: white; box-shadow: 0 2px 8px rgba(7,19,58,.04), 0 16px 40px rgba(7,19,58,.12), 0 32px 80px rgba(7,19,58,.1); }
+.notification-bell__panel .notification-item { border: 0; border-bottom: 1px solid #f0f2f0; background: transparent; cursor: pointer; }
+.notification-bell__panel .notification-item--unread { background: #fff8f2; }
+.notification-bell__panel .notification-item--unread:hover { background: #fff1e6; }
+.notification-item__icon { flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; color: var(--brand); background: var(--brand-pale); }
+.notification-item__cancelled { color: #9f3737; font-weight: 700; }
+.notification-bell__panel .notification-panel__list { max-height: min(420px, 70svh); }
+@media (max-width: 590px) {
+  /* Phones: drop the panel below the topbar at full width instead of anchoring it to the bell. */
+  .notification-bell__panel { position: fixed; top: calc(env(safe-area-inset-top) + 72px); left: 16px; right: 16px; width: auto; max-width: none; transform: none; }
+}

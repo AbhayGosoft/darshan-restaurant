@@ -47,6 +47,7 @@ export const env = {
 
   bookingModificationCutoffMinutes: Number(process.env.BOOKING_MODIFICATION_CUTOFF_MINUTES ?? 60),
   bookingReminderMinutesBefore: Number(process.env.BOOKING_REMINDER_MINUTES_BEFORE ?? 120),
+  businessTimeZone: process.env.BUSINESS_TIMEZONE ?? "Asia/Kolkata",
 
   appClientKey: process.env.APP_CLIENT_KEY,
 };

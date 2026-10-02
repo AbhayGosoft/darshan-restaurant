@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, ArrowRight, Ban, MapPin, Plus, RotateCcw, Trash2, UtensilsCrossed } from "lucide-react";
 import { api, resolveAssetUrl } from "@/lib/api-client";
 import { queryClient } from "@/lib/query-client";
@@ -24,6 +25,7 @@ const emptyForm: CreateForm = {
 };
 
 export function RestaurantsPage({ embedded = false }: { embedded?: boolean }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const enterRestaurant = useAppStore((state) => state.enterRestaurant);
   const isSuperAdmin = useAppStore((state) => state.admin?.role === "SUPERADMIN");
@@ -92,34 +94,34 @@ export function RestaurantsPage({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? "" : "page"}>
       {!embedded && selectedAdmin && (
         <Button type="button" variant="ghost" onClick={() => { exitAdminSelection(); navigate("/"); }}>
-          <ArrowLeft size={14} /> Back to admins
+          <ArrowLeft size={14} /> {t("restaurants.backToAdmins")}
         </Button>
       )}
       <section className="resource-head">
         <span className="eyebrow">
-          <UtensilsCrossed size={14} /> {selectedAdmin ? `${selectedAdmin.name}'s restaurants` : "Restaurants"}
+          <UtensilsCrossed size={14} /> {selectedAdmin ? t("restaurants.adminRestaurants", { name: selectedAdmin.name }) : t("restaurants.title")}
         </span>
-        <Button type="button" onClick={() => { reset(emptyForm); setDialogOpen(true); }}><Plus size={17} /> Add restaurant</Button>
+        <Button type="button" onClick={() => { reset(emptyForm); setDialogOpen(true); }}><Plus size={17} /> {t("restaurants.add")}</Button>
       </section>
 
-      <ResourceToolbar search={search} onSearchChange={setSearch} placeholder="Search restaurants..." />
+      <ResourceToolbar search={search} onSearchChange={setSearch} placeholder={t("restaurants.search")} />
       <StatusTabs value={view} onChange={setView} />
       {notice && <Notice message={notice} onClose={() => setNotice("")} />}
 
       {restaurants.isLoading && <LoadingGrid />}
-      {restaurants.isError && <StateView title="Couldn't load restaurants" message="Check the backend connection and try once more." action={() => void restaurants.refetch()} />}
+      {restaurants.isError && <StateView title={t("restaurants.loadError")} message={t("common.loadErrorMessage")} action={() => void restaurants.refetch()} />}
       {restaurants.isSuccess && !restaurants.data.restaurants.length && view === "inactive" && (
-        <StateView title="No deactivated restaurants" message="Restaurants you deactivate will show up here." />
+        <StateView title={t("restaurants.noDeactivatedTitle")} message={t("restaurants.noDeactivatedMessage")} />
       )}
       {restaurants.isSuccess && !restaurants.data.restaurants.length && view === "active" && (
         <StateView
-          title="No restaurants yet"
+          title={t("restaurants.emptyTitle")}
           message={
             selectedAdmin
-              ? `${selectedAdmin.name} hasn't been assigned to any restaurant yet.`
+              ? t("restaurants.emptyForAdmin", { name: selectedAdmin.name })
               : isSuperAdmin
-                ? "Add the first restaurant to get started."
-                : "You haven't been assigned to any restaurant yet. Contact your SuperAdmin."
+                ? t("restaurants.emptySuperAdmin")
+                : t("restaurants.emptyAdmin")
           }
         />
       )}
@@ -137,17 +139,17 @@ export function RestaurantsPage({ embedded = false }: { embedded?: boolean }) {
             {isSuperAdmin && (
               <span className="restaurant-picker-card__actions">
                 {restaurant.status === "INACTIVE" ? (
-                  <span role="button" tabIndex={0} className="icon-button" aria-label="Activate restaurant" title="Activate"
+                  <span role="button" tabIndex={0} className="icon-button" aria-label={t("restaurants.activateAria")} title={t("common.activate")}
                     onClick={(event) => { event.stopPropagation(); if (!activate.isPending) activate.mutate(restaurant.id); }}>
                     <RotateCcw size={14} />
                   </span>
                 ) : (
-                  <span role="button" tabIndex={0} className="icon-button" aria-label="Deactivate restaurant" title="Deactivate"
+                  <span role="button" tabIndex={0} className="icon-button" aria-label={t("restaurants.deactivateAria")} title={t("common.deactivate")}
                     onClick={(event) => { event.stopPropagation(); setRestaurantToDeactivate(restaurant); }}>
                     <Ban size={14} />
                   </span>
                 )}
-                <span role="button" tabIndex={0} className="icon-button icon-button--danger" aria-label="Delete restaurant permanently" title="Delete permanently"
+                <span role="button" tabIndex={0} className="icon-button icon-button--danger" aria-label={t("restaurants.deleteAria")} title={t("common.deletePermanently")}
                   onClick={(event) => { event.stopPropagation(); remove.reset(); setRestaurantToDelete(restaurant); }}>
                   <Trash2 size={14} />
                 </span>
@@ -158,38 +160,38 @@ export function RestaurantsPage({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       {dialogOpen && (
-        <ResourceDialog title="Add restaurant" eyebrow="New restaurant" onClose={() => setDialogOpen(false)}>
+        <ResourceDialog title={t("restaurants.add")} eyebrow={t("restaurants.newEyebrow")} onClose={() => setDialogOpen(false)}>
           <form noValidate onSubmit={handleSubmit((data) => create.mutate(data))}>
             <div className="property-form-grid">
-              <label className="property-form-grid__wide"><span className="label-title">Restaurant name<Req /></span>
-                <input {...register("name", { required: "Name is required" })} />
+              <label className="property-form-grid__wide"><span className="label-title">{t("restaurants.nameLabel")}<Req /></span>
+                <input {...register("name", { required: t("common.nameRequired") })} />
                 <FieldError error={errors.name} />
               </label>
-              <label className="property-form-grid__wide"><span className="label-title">Cuisine label<Req /></span>
-                <input placeholder="Pure Veg • North Indian" {...register("cuisineLabel", { required: "Cuisine label is required" })} />
+              <label className="property-form-grid__wide"><span className="label-title">{t("restaurants.cuisineLabel")}<Req /></span>
+                <input placeholder={t("restaurants.cuisinePlaceholder")} {...register("cuisineLabel", { required: t("restaurants.cuisineRequired") })} />
                 <FieldError error={errors.cuisineLabel} />
               </label>
-              <label className="property-form-grid__wide"><span className="label-title">Address<Req /></span>
-                <input {...register("addressLine", { required: "Address is required" })} />
+              <label className="property-form-grid__wide"><span className="label-title">{t("common.address")}<Req /></span>
+                <input {...register("addressLine", { required: t("common.addressRequired") })} />
                 <FieldError error={errors.addressLine} />
               </label>
-              <label><span className="label-title">City<Req /></span><input {...register("city", { required: "City is required" })} /><FieldError error={errors.city} /></label>
-              <label><span className="label-title">Phone<Req /></span><PhoneField control={control} name="phone" error={errors.phone} required /></label>
-              <label><span className="label-title">Latitude<Req /></span><input type="number" step="0.0000001" {...register("latitude", { required: true, valueAsNumber: true })} /></label>
-              <label><span className="label-title">Longitude<Req /></span><input type="number" step="0.0000001" {...register("longitude", { required: true, valueAsNumber: true })} /></label>
-              <label>Prep time min<input type="number" {...register("prepTimeMin", { valueAsNumber: true })} /></label>
-              <label>Prep time max<input type="number" {...register("prepTimeMax", { valueAsNumber: true })} /></label>
-              <label>Price for two (₹)<input type="number" {...register("priceForTwo", { valueAsNumber: true })} /></label>
-              <label>Seating capacity<input type="number" {...register("seatingCapacity", { valueAsNumber: true })} /></label>
-              <label>Max party size<input type="number" {...register("maxPartySize", { valueAsNumber: true })} /></label>
+              <label><span className="label-title">{t("common.city")}<Req /></span><input {...register("city", { required: t("common.cityRequired") })} /><FieldError error={errors.city} /></label>
+              <label><span className="label-title">{t("common.phone")}<Req /></span><PhoneField control={control} name="phone" error={errors.phone} required /></label>
+              <label><span className="label-title">{t("common.latitude")}<Req /></span><input type="number" step="0.0000001" {...register("latitude", { required: true, valueAsNumber: true })} /></label>
+              <label><span className="label-title">{t("common.longitude")}<Req /></span><input type="number" step="0.0000001" {...register("longitude", { required: true, valueAsNumber: true })} /></label>
+              <label>{t("restaurants.prepTimeMin")}<input type="number" {...register("prepTimeMin", { valueAsNumber: true })} /></label>
+              <label>{t("restaurants.prepTimeMax")}<input type="number" {...register("prepTimeMax", { valueAsNumber: true })} /></label>
+              <label>{t("restaurants.priceForTwo")}<input type="number" {...register("priceForTwo", { valueAsNumber: true })} /></label>
+              <label>{t("restaurants.seatingCapacity")}<input type="number" {...register("seatingCapacity", { valueAsNumber: true })} /></label>
+              <label>{t("restaurants.maxPartySize")}<input type="number" {...register("maxPartySize", { valueAsNumber: true })} /></label>
             </div>
             {create.error && <div className="form-error">{create.error.message}</div>}
-            <DialogFooter onClose={() => setDialogOpen(false)} loading={create.isPending} label="Add restaurant" />
+            <DialogFooter onClose={() => setDialogOpen(false)} loading={create.isPending} label={t("restaurants.add")} />
           </form>
         </ResourceDialog>
       )}
-      {restaurantToDeactivate && <ConfirmDialog title="Deactivate restaurant?" message={`${restaurantToDeactivate.name} will no longer be available for bookings.`} loading={deactivate.isPending} onClose={() => setRestaurantToDeactivate(null)} onConfirm={() => deactivate.mutate(restaurantToDeactivate.id, { onSuccess: () => setRestaurantToDeactivate(null) })} />}
-      {restaurantToDelete && <ConfirmDialog title="Delete restaurant permanently?" message={`${restaurantToDelete.name} and its menu, slots and tables will be removed. If it has any bookings, it will be deactivated instead.`} confirmLabel="Delete permanently" danger loading={remove.isPending} error={remove.error?.message} onClose={() => setRestaurantToDelete(null)} onConfirm={() => remove.mutate(restaurantToDelete)} />}
+      {restaurantToDeactivate && <ConfirmDialog title={t("restaurants.deactivateTitle")} message={t("restaurants.deactivateMessage", { name: restaurantToDeactivate.name })} loading={deactivate.isPending} onClose={() => setRestaurantToDeactivate(null)} onConfirm={() => deactivate.mutate(restaurantToDeactivate.id, { onSuccess: () => setRestaurantToDeactivate(null) })} />}
+      {restaurantToDelete && <ConfirmDialog title={t("restaurants.deleteTitle")} message={t("restaurants.deleteMessage", { name: restaurantToDelete.name })} confirmLabel={t("common.deletePermanently")} danger loading={remove.isPending} error={remove.error?.message} onClose={() => setRestaurantToDelete(null)} onConfirm={() => remove.mutate(restaurantToDelete)} />}
     </div>
   );
 }

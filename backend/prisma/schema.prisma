@@ -101,6 +101,8 @@ model AdminUser {
   passwordHash String       @map("password_hash")
   role         AdminRole    @default(ADMIN)
   status       RecordStatus @default(ACTIVE)
+  /// Last time this admin opened the new-bookings notification panel; bookings created after it count as unread.
+  notificationsSeenAt DateTime? @map("notifications_seen_at")
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
@@ -301,6 +303,7 @@ model RestaurantBooking {
   @@index([tableId, date, time])
   @@index([restaurantUserId, status])
   @@index([status, date])
+  @@index([restaurantId, createdAt])
   @@map("restaurant_bookings")
 }
 

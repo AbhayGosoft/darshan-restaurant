@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Pencil, Plus, Tags, Trash2 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { queryClient } from "@/lib/query-client";
@@ -12,6 +13,7 @@ import { ConfirmDialog, DialogFooter, FieldError, Notice, ResourceDialog, Req, S
 type CategoryForm = { label: string; sortOrder: number; isActive: boolean };
 
 export function CategoriesSettingsPage() {
+  const { t } = useTranslation();
   const categories = useQuery({ queryKey: ["restaurant-categories"], queryFn: () => api<RestaurantCategory[]>("/admin/categories") });
   const [dialog, setDialog] = useState<RestaurantCategory | "new" | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<RestaurantCategory | null>(null);
@@ -39,7 +41,7 @@ export function CategoriesSettingsPage() {
   const openEdit = (category: RestaurantCategory) => { reset({ label: category.label, sortOrder: category.sortOrder, isActive: category.isActive }); setDialog(category); };
 
   if (categories.isLoading) return <LoadingGrid />;
-  if (categories.isError) return <StateView title="Couldn't load categories" message="Check the backend connection and try once more." action={() => void categories.refetch()} />;
+  if (categories.isError) return <StateView title={t("categories.loadError")} message={t("common.loadErrorMessage")} action={() => void categories.refetch()} />;
 
   const active = (categories.data ?? []).filter((category) => category.isActive);
   const inactive = (categories.data ?? []).filter((category) => !category.isActive);
@@ -48,8 +50,8 @@ export function CategoriesSettingsPage() {
   return (
     <div>
       <section className="resource-head">
-        <span className="eyebrow"><Tags size={14} /> Restaurant categories</span>
-        <Button type="button" onClick={openNew}><Plus size={17} /> Add category</Button>
+        <span className="eyebrow"><Tags size={14} /> {t("categories.title")}</span>
+        <Button type="button" onClick={openNew}><Plus size={17} /> {t("categories.add")}</Button>
       </section>
       <StatusTabs value={view} onChange={setView} activeCount={active.length} inactiveCount={inactive.length} />
       {notice && <Notice message={notice} onClose={() => setNotice("")} />}
@@ -59,34 +61,34 @@ export function CategoriesSettingsPage() {
             <div className="menu-category-card__head">
               <div><strong>{category.label}</strong> <small className="muted">({category.key})</small></div>
               <div className="menu-category-card__actions">
-                <button type="button" className="icon-button" aria-label="Edit category" onClick={() => openEdit(category)}><Pencil size={15} /></button>
-                <button type="button" className="icon-button icon-button--danger" aria-label="Delete category permanently" title="Delete permanently" onClick={() => { remove.reset(); setCategoryToDelete(category); }}><Trash2 size={15} /></button>
+                <button type="button" className="icon-button" aria-label={t("categories.editAria")} onClick={() => openEdit(category)}><Pencil size={15} /></button>
+                <button type="button" className="icon-button icon-button--danger" aria-label={t("categories.deleteAria")} title={t("common.deletePermanently")} onClick={() => { remove.reset(); setCategoryToDelete(category); }}><Trash2 size={15} /></button>
               </div>
             </div>
           </div>
         ))}
         {!visible.length && (view === "active"
-          ? <StateView title="No active categories" message="Add categories restaurants can be tagged with, e.g. Pure Veg, North Indian." />
-          : <StateView title="No deactivated categories" message="Categories marked inactive in the edit form show up here." />)}
+          ? <StateView title={t("categories.noActiveTitle")} message={t("categories.noActiveMessage")} />
+          : <StateView title={t("categories.noDeactivatedTitle")} message={t("categories.noDeactivatedMessage")} />)}
       </div>
 
       {dialog && (
-        <ResourceDialog title={dialog === "new" ? "Add category" : "Edit category"} eyebrow="Restaurant category" onClose={() => setDialog(null)}>
+        <ResourceDialog title={dialog === "new" ? t("categories.add") : t("categories.edit")} eyebrow={t("categories.eyebrow")} onClose={() => setDialog(null)}>
           <form noValidate onSubmit={handleSubmit((data) => save.mutate(data))}>
             <div className="property-form-grid">
-              <label className="property-form-grid__wide"><span className="label-title">Label<Req /></span>
-                <input placeholder="e.g. North Indian" {...register("label", { required: "Label is required" })} />
+              <label className="property-form-grid__wide"><span className="label-title">{t("categories.label")}<Req /></span>
+                <input placeholder={t("categories.labelPlaceholder")} {...register("label", { required: t("categories.labelRequired") })} />
                 <FieldError error={errors.label} />
               </label>
-              <label>Sort order<input type="number" {...register("sortOrder", { valueAsNumber: true })} /></label>
-              <label className="check-option"><input type="checkbox" {...register("isActive")} /><span>Active</span></label>
+              <label>{t("common.sortOrder")}<input type="number" {...register("sortOrder", { valueAsNumber: true })} /></label>
+              <label className="check-option"><input type="checkbox" {...register("isActive")} /><span>{t("common.active")}</span></label>
             </div>
             {save.error && <div className="form-error">{save.error.message}</div>}
-            <DialogFooter onClose={() => setDialog(null)} loading={save.isPending} label={dialog === "new" ? "Add category" : "Save changes"} />
+            <DialogFooter onClose={() => setDialog(null)} loading={save.isPending} label={dialog === "new" ? t("categories.add") : t("common.saveChanges")} />
           </form>
         </ResourceDialog>
       )}
-      {categoryToDelete && <ConfirmDialog title="Delete category permanently?" message={`${categoryToDelete.label} will be removed from every restaurant. This cannot be undone.`} confirmLabel="Delete permanently" danger loading={remove.isPending} error={remove.error?.message} onClose={() => setCategoryToDelete(null)} onConfirm={() => remove.mutate(categoryToDelete)} />}
+      {categoryToDelete && <ConfirmDialog title={t("categories.deleteTitle")} message={t("categories.deleteMessage", { name: categoryToDelete.label })} confirmLabel={t("common.deletePermanently")} danger loading={remove.isPending} error={remove.error?.message} onClose={() => setCategoryToDelete(null)} onConfirm={() => remove.mutate(categoryToDelete)} />}
     </div>
   );
 }

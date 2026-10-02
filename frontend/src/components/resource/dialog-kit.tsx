@@ -2,8 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { Camera, LoaderCircle, Search, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Controller, type Control, type FieldError as RHFFieldError, type FieldValues, type Path } from "react-hook-form";
 import { resolveAssetUrl, uploadImages } from "@/lib/api-client";
+import i18n from "@/i18n";
 import { useBackCloseable } from "@/lib/modal-stack";
 import { Button } from "@/components/ui/Button";
 
@@ -250,6 +252,7 @@ function splitPhone(value: string) {
 }
 
 export function PhoneInput({ value, onChange, required = false }: { value: string; onChange: (value: string) => void; required?: boolean }) {
+  const { t } = useTranslation();
   const { countryCode, number } = splitPhone(value);
   const [open, setOpen] = useState(false);
   const [openUp, setOpenUp] = useState(false);
@@ -305,7 +308,7 @@ export function PhoneInput({ value, onChange, required = false }: { value: strin
           <span aria-hidden="true">▾</span>
         </button>
         {open && (
-          <div className={clsx("country-select__panel", openUp && "country-select__panel--top")} role="listbox" aria-label="Country code list">
+          <div className={clsx("country-select__panel", openUp && "country-select__panel--top")} role="listbox" aria-label={t("form.countryCodeList")}>
             {SORTED_COUNTRY_CODES.map((code) => (
               <button
                 key={`${code.value}-${code.label}`}
@@ -334,10 +337,11 @@ export function PhoneInput({ value, onChange, required = false }: { value: strin
 }
 
 export function PhoneField<T extends FieldValues>({ control, name, error, required = false }: { control: Control<T>; name: Path<T>; error?: RHFFieldError; required?: boolean }) {
+  const { t } = useTranslation();
   return <>
     <Controller control={control} name={name} rules={{
-      required: required ? "Phone number is required" : false,
-      validate: (value) => !value || PHONE_PATTERN.test(value) || "Enter a valid phone number with up to 10 digits or international code",
+      required: required ? t("form.phoneRequired") : false,
+      validate: (value) => !value || PHONE_PATTERN.test(value) || t("form.phoneInvalid"),
     }} render={({ field }) => <PhoneInput value={field.value ?? ""} onChange={field.onChange} required={required} />} />
     <FieldError error={error} />
   </>;
@@ -362,17 +366,18 @@ export function ResourceToolbar({ search, onSearchChange, placeholder, filter, o
   onClear?: () => void;
   children?: ReactNode;
 }) {
+  const { t } = useTranslation();
   const hasFilter = Boolean(filter) || Boolean(search);
   return (
     <section className="toolbar">
       <div className="search-box"><Search size={19} /><input value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder={placeholder} /></div>
       {filterOptions && onFilterChange && (
-        <select className="filter-select" aria-label="Filter" value={filter} onChange={(event) => onFilterChange(event.target.value)}>
+        <select className="filter-select" aria-label={t("common.filter")} value={filter} onChange={(event) => onFilterChange(event.target.value)}>
           {filterOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       )}
       {onClear && (
-        <button type="button" className="toolbar-clear-button" onClick={onClear} disabled={!hasFilter}>Clear</button>
+        <button type="button" className="toolbar-clear-button" onClick={onClear} disabled={!hasFilter}>{t("common.clear")}</button>
       )}
       {children}
     </section>
@@ -401,6 +406,7 @@ export function normalizeCover<T extends ManagedImage>(images: T[], supportsCove
 }
 
 export function ResourceDialog({ title, eyebrow, dialogClassName, onClose, children }: { title: string; eyebrow: string; dialogClassName?: string; onClose: () => void; children: ReactNode }) {
+  const { t } = useTranslation();
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && onClose();
     document.addEventListener("keydown", closeOnEscape);
@@ -410,7 +416,7 @@ export function ResourceDialog({ title, eyebrow, dialogClassName, onClose, child
   return (
     <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className={clsx("property-dialog", dialogClassName)} role="dialog" aria-modal="true" aria-labelledby="resource-dialog-title">
-        <header><div><span className="eyebrow">{eyebrow}</span><h2 id="resource-dialog-title">{title}</h2></div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><X /></button></header>
+        <header><div><span className="eyebrow">{eyebrow}</span><h2 id="resource-dialog-title">{title}</h2></div><button type="button" className="icon-button" aria-label={t("common.close")} onClick={onClose}><X /></button></header>
         {children}
       </section>
     </div>
@@ -418,14 +424,16 @@ export function ResourceDialog({ title, eyebrow, dialogClassName, onClose, child
 }
 
 export function DialogFooter({ onClose, loading, label }: { onClose: () => void; loading: boolean; label: string }) {
-  return <footer><Button type="button" variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit" loading={loading}>{label}</Button></footer>;
+  const { t } = useTranslation();
+  return <footer><Button type="button" variant="ghost" onClick={onClose}>{t("common.cancel")}</Button><Button type="submit" loading={loading}>{label}</Button></footer>;
 }
 
-export function ConfirmDialog({ title, message, onClose, onConfirm, loading = false, confirmLabel = "Deactivate", danger = false, error }: { title: string; message: string; onClose: () => void; onConfirm: () => void; loading?: boolean; confirmLabel?: string; danger?: boolean; error?: string }) {
-  return <ResourceDialog title={title} eyebrow="Confirmation required" onClose={loading ? () => undefined : onClose} dialogClassName="confirm-dialog">
+export function ConfirmDialog({ title, message, onClose, onConfirm, loading = false, confirmLabel, danger = false, error }: { title: string; message: string; onClose: () => void; onConfirm: () => void; loading?: boolean; confirmLabel?: string; danger?: boolean; error?: string }) {
+  const { t } = useTranslation();
+  return <ResourceDialog title={title} eyebrow={t("common.confirmationRequired")} onClose={loading ? () => undefined : onClose} dialogClassName="confirm-dialog">
     <p className="confirm-dialog__message">{message}</p>
     {error && <div className="form-error">{error}</div>}
-    <footer><Button type="button" variant="ghost" onClick={onClose} disabled={loading}>Cancel</Button><Button type="button" className={clsx(danger && "button--danger")} loading={loading} onClick={onConfirm}>{confirmLabel}</Button></footer>
+    <footer><Button type="button" variant="ghost" onClick={onClose} disabled={loading}>{t("common.cancel")}</Button><Button type="button" className={clsx(danger && "button--danger")} loading={loading} onClick={onConfirm}>{confirmLabel ?? t("common.deactivate")}</Button></footer>
   </ResourceDialog>;
 }
 
@@ -433,28 +441,31 @@ export type ListStatus = "active" | "inactive";
 
 /** Active and deactivated records are listed separately so deactivated ones never mix into the working list. */
 export function StatusTabs({ value, onChange, activeCount, inactiveCount }: { value: ListStatus; onChange: (value: ListStatus) => void; activeCount?: number; inactiveCount?: number }) {
+  const { t } = useTranslation();
   const tab = (status: ListStatus, label: string, count?: number) => (
     <button type="button" role="tab" aria-selected={value === status} className={clsx("status-tab", value === status && "active")} onClick={() => onChange(status)}>
       {label}{count !== undefined && <span className="status-tab__count">{count}</span>}
     </button>
   );
-  return <div className="status-tabs" role="tablist">{tab("active", "Active", activeCount)}{tab("inactive", "Deactivated", inactiveCount)}</div>;
+  return <div className="status-tabs" role="tablist">{tab("active", t("common.active"), activeCount)}{tab("inactive", t("common.deactivated"), inactiveCount)}</div>;
 }
 
 export function Notice({ message, onClose }: { message: string; onClose: () => void }) {
-  return <div className="form-notice" role="status"><span>{message}</span><button type="button" className="icon-button" aria-label="Dismiss" onClick={onClose}><X size={14} /></button></div>;
+  const { t } = useTranslation();
+  return <div className="form-notice" role="status"><span>{message}</span><button type="button" className="icon-button" aria-label={t("common.dismiss")} onClick={onClose}><X size={14} /></button></div>;
 }
 
 /** Message for a hard-delete result — the API deactivates instead of deleting when the record has booking history. */
 export function hardDeleteMessage(name: string, result: { deleted: boolean; deactivated: boolean }) {
-  return result.deleted ? `${name} was deleted permanently.` : `${name} has booking history, so it was deactivated instead of deleted.`;
+  return result.deleted ? i18n.t("status.deletedPermanently", { name }) : i18n.t("status.deactivatedInstead", { name });
 }
 
 export function CheckboxList({ title, items, selected, onChange }: { title: string; items: { id: string; label: string }[]; selected: string[]; onChange: (ids: string[]) => void }) {
+  const { t } = useTranslation();
   return (
     <div className="property-form-grid__wide choice-panel">
       <strong>{title}</strong>
-      {items.length ? items.map((item) => <label className="check-option" key={item.id}><input type="checkbox" checked={selected.includes(item.id)} onChange={(event) => onChange(event.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id))} /><span>{item.label}</span></label>) : <small>No {title.toLowerCase()} available for this property.</small>}
+      {items.length ? items.map((item) => <label className="check-option" key={item.id}><input type="checkbox" checked={selected.includes(item.id)} onChange={(event) => onChange(event.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id))} /><span>{item.label}</span></label>) : <small>{t("form.noOptions", { title: title.toLowerCase() })}</small>}
     </div>
   );
 }
@@ -462,6 +473,7 @@ export function CheckboxList({ title, items, selected, onChange }: { title: stri
 type PendingPreview = { localUrl: string; file: File };
 
 export function ImageManager({ images, onChange, supportsCover = false }: { images: ManagedImage[]; onChange: (images: ManagedImage[]) => void; supportsCover?: boolean }) {
+  const { t } = useTranslation();
   const [imageUrl, setImageUrl] = useState("");
   const [urlError, setUrlError] = useState("");
   const [pendingPreviews, setPendingPreviews] = useState<PendingPreview[]>([]);
@@ -496,33 +508,33 @@ export function ImageManager({ images, onChange, supportsCover = false }: { imag
       setImageUrl("");
       setUrlError("");
     } catch {
-      setUrlError("Enter a valid image URL");
+      setUrlError(t("images.invalidUrl"));
     }
   };
 
   return (
     <div className="image-manager">
-      <div className="image-url-heading"><strong>Images</strong><small>Add a URL or upload local images for testing</small></div>
-      <div className="image-url-row"><input type="url" value={imageUrl} placeholder="https://example.com/property.jpg" onChange={(event) => setImageUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addImage(); } }} /><button type="button" className="image-upload-button" disabled={!imageUrl.trim()} onClick={addImage}><Camera size={17} /> Add image</button></div>
+      <div className="image-url-heading"><strong>{t("images.title")}</strong><small>{t("images.urlHint")}</small></div>
+      <div className="image-url-row"><input type="url" value={imageUrl} placeholder="https://example.com/property.jpg" onChange={(event) => setImageUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addImage(); } }} /><button type="button" className="image-upload-button" disabled={!imageUrl.trim()} onClick={addImage}><Camera size={17} /> {t("images.addImage")}</button></div>
       {urlError && <div className="form-error">{urlError}</div>}
-      <div className="image-manager__title"><div><strong>Upload</strong><small>JPEG, PNG, WebP or GIF - up to 5 MB each</small></div><label className="image-upload-button"><Camera size={17} /> {upload.isPending ? "Uploading..." : "Upload images"}<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple disabled={upload.isPending} onChange={(event) => { if (event.target.files?.length) handleFiles(event.target.files); event.target.value = ""; }} /></label></div>
+      <div className="image-manager__title"><div><strong>{t("images.upload")}</strong><small>{t("images.uploadHint")}</small></div><label className="image-upload-button"><Camera size={17} /> {upload.isPending ? t("images.uploading") : t("images.uploadImages")}<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple disabled={upload.isPending} onChange={(event) => { if (event.target.files?.length) handleFiles(event.target.files); event.target.value = ""; }} /></label></div>
       {images.length > 0 || pendingPreviews.length > 0 ? (
         <div className="image-preview-grid">
           {images.map((image, index) => (
             <div className="image-preview" key={`${image.imageUrl}-${index}`}>
-              <img src={resolveAssetUrl(image.imageUrl)} alt={`Uploaded ${index + 1}`} />
-              {supportsCover && <button type="button" className={image.isCover ? "cover-badge cover-badge--active" : "cover-badge"} onClick={() => onChange(images.map((item, itemIndex) => ({ ...item, isCover: itemIndex === index })))}>{image.isCover ? "Cover" : "Set cover"}</button>}
-              <button type="button" className="image-remove" aria-label={`Remove image ${index + 1}`} onClick={() => onChange(normalizeCover(images.filter((_, itemIndex) => itemIndex !== index), supportsCover))}><X size={15} /></button>
+              <img src={resolveAssetUrl(image.imageUrl)} alt={t("images.uploadedAlt", { index: index + 1 })} />
+              {supportsCover && <button type="button" className={image.isCover ? "cover-badge cover-badge--active" : "cover-badge"} onClick={() => onChange(images.map((item, itemIndex) => ({ ...item, isCover: itemIndex === index })))}>{image.isCover ? t("images.cover") : t("images.setCover")}</button>}
+              <button type="button" className="image-remove" aria-label={t("images.remove", { index: index + 1 })} onClick={() => onChange(normalizeCover(images.filter((_, itemIndex) => itemIndex !== index), supportsCover))}><X size={15} /></button>
             </div>
           ))}
           {pendingPreviews.map((preview) => (
             <div className="image-preview image-preview--pending" key={preview.localUrl}>
-              <img src={preview.localUrl} alt="Uploading" />
+              <img src={preview.localUrl} alt={t("images.uploadingAlt")} />
               <span className="image-preview__spinner"><LoaderCircle size={18} className="spin" /></span>
             </div>
           ))}
         </div>
-      ) : <div className="image-empty"><Camera /><span>No images uploaded yet</span></div>}
+      ) : <div className="image-empty"><Camera /><span>{t("images.empty")}</span></div>}
       {upload.error && <div className="form-error">{upload.error.message}</div>}
     </div>
   );

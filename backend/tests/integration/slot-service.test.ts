@@ -8,6 +8,12 @@ vi.mock("../../src/lib/prisma.js", async () => {
 let prisma: any;
 let getAvailableSlots: typeof import("../../src/services/slotService.js").getAvailableSlots;
 
+const tomorrow = () => {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+};
+
 const activeRestaurant = { id: "r1", status: "ACTIVE", seatingCapacity: 10, maxPartySize: 12 };
 
 beforeAll(async () => {
@@ -40,8 +46,7 @@ describe("getAvailableSlots", () => {
     ]);
     prisma.restaurantBooking.groupBy.mockResolvedValue([{ time: "12:00", _sum: { people: 9 } }]);
 
-    const today = new Date().toISOString().slice(0, 10);
-    const result = await getAvailableSlots("r1", today, 2);
+    const result = await getAvailableSlots("r1", tomorrow(), 2);
 
     const lunch = result.groups.find((g: any) => g.label === "Lunch");
     const slot1200 = lunch.slots.find((s: any) => s.time === "12:00 PM");
@@ -61,10 +66,41 @@ describe("getAvailableSlots", () => {
     ]);
     prisma.restaurantBooking.groupBy.mockResolvedValue([]);
 
-    const today = new Date().toISOString().slice(0, 10);
-    const result = await getAvailableSlots("r1", today, 1);
+    const result = await getAvailableSlots("r1", tomorrow(), 1);
 
     expect(result.groups.map((g: any) => g.label).sort()).toEqual(["Dinner", "Lunch"]);
     expect(result.maxPeople).toBe(12);
+  });
+
+  it("rejects a past date", async () => {
+    prisma.restaurant.findUnique.mockResolvedValue(activeRestaurant);
+    const yesterday = new Date();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    await expect(getAvailableSlots("r1", yesterday.toISOString().slice(0, 10), 2)).rejects.toThrow(/between today/);
+  });
+
+  it("marks today's slots whose time has already passed as unavailable", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-22T15:10:00.000Z"));
+    try {
+      prisma.restaurant.findUnique.mockResolvedValue(activeRestaurant);
+      prisma.slotConfiguration.findMany.mockResolvedValue([
+        { id: "s1", meal: "LUNCH", time: "12:00", sortOrder: 0, isActive: true },
+        { id: "s2", meal: "DINNER", time: "15:00", sortOrder: 0, isActive: true },
+        { id: "s3", meal: "DINNER", time: "19:00", sortOrder: 1, isActive: true },
+      ]);
+      prisma.restaurantBooking.groupBy.mockResolvedValue([]);
+
+      const result = await getAvailableSlots("r1", "2026-08-22", 2);
+      const slots = result.groups.flatMap((g: any) => g.slots);
+      const byTime = Object.fromEntries(slots.map((s: any) => [s.time, s]));
+
+      expect(byTime["12:00 PM"].available).toBe(false);
+      expect(byTime["3:00 PM"].available).toBe(false);
+      expect(byTime["7:00 PM"].available).toBe(true);
+      expect(byTime["7:00 PM"].seatsLeft).toBe(10);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
