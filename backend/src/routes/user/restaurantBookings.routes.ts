@@ -20,11 +20,13 @@ router.get(
 
 const modifySchema = z
   .object({
+    /** Same-day only — accepted for older app builds, must be today if sent. */
     date: z.string().min(1).optional(),
+    /** New arrival time, e.g. "2:00 PM". */
     time: z.string().min(1).optional(),
     people: z.coerce.number().int().min(1).optional(),
   })
-  .refine((body) => body.date || body.time || body.people, { message: "Provide at least one of date, time, people" });
+  .refine((body) => body.time || body.people, { message: "Provide time and/or people" });
 
 router.patch(
   "/:id",

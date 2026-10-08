@@ -1,14 +1,13 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { clsx } from "clsx";
 import { useTranslation } from "react-i18next";
-import { Building2, Clock, Settings, Tags, UtensilsCrossed } from "lucide-react";
+import { Building2, Settings, Tags, UtensilsCrossed } from "lucide-react";
 // import { Armchair } from "lucide-react"; // Table booking disabled
 import { useAppStore } from "@/store/app-store";
 
 const baseTabs = [
   { to: "general", labelKey: "settings.tabs.general", icon: Building2 },
   { to: "menu", labelKey: "settings.tabs.menu", icon: UtensilsCrossed },
-  { to: "slots", labelKey: "settings.tabs.slots", icon: Clock },
   // Table booking disabled for now — re-enable together with the "tables" route in App.tsx.
   // { to: "tables", labelKey: "settings.tabs.tables", icon: Armchair },
 ] as const;

@@ -45,7 +45,6 @@ export const env = {
   oneSignalAppId: process.env.ONESIGNAL_APP_ID,
   oneSignalApiKey: process.env.ONESIGNAL_API_KEY,
 
-  bookingModificationCutoffMinutes: Number(process.env.BOOKING_MODIFICATION_CUTOFF_MINUTES ?? 60),
   bookingReminderMinutesBefore: Number(process.env.BOOKING_REMINDER_MINUTES_BEFORE ?? 120),
   businessTimeZone: process.env.BUSINESS_TIMEZONE ?? "Asia/Kolkata",
 

@@ -41,6 +41,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     nextSocket.on(socketEvents.bookingNew, refreshBookings);
     nextSocket.on(socketEvents.bookingModified, refreshBookings);
     nextSocket.on(socketEvents.bookingCancelled, refreshBookings);
+    nextSocket.on(socketEvents.bookingStatusChanged, refreshBookings);
 
     return () => {
       nextSocket.disconnect();

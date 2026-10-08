@@ -19,8 +19,6 @@ const CATEGORY_SEEDS = [
   { key: "cafe", label: "Cafe", sortOrder: 4 },
 ] as const;
 
-const LUNCH_TIMES = ["11:00", "11:30", "12:00", "12:30", "13:00"];
-const DINNER_TIMES = ["19:00", "19:30", "20:00", "20:30", "21:00"];
 
 const main = async () => {
   if (!process.env.DATABASE_URL) throw new Error("Set DATABASE_URL before running the seed.");
@@ -103,14 +101,6 @@ const main = async () => {
     await prisma.restaurantCategoryLink.createMany({
       data: data.categoryKeys.map((key) => ({ restaurantId: restaurant.id, categoryId: categoryByKey[key]!.id })),
       skipDuplicates: true,
-    });
-
-    await prisma.slotConfiguration.deleteMany({ where: { restaurantId: restaurant.id } });
-    await prisma.slotConfiguration.createMany({
-      data: [
-        ...LUNCH_TIMES.map((time, index) => ({ restaurantId: restaurant.id, meal: "LUNCH" as const, time, sortOrder: index })),
-        ...DINNER_TIMES.map((time, index) => ({ restaurantId: restaurant.id, meal: "DINNER" as const, time, sortOrder: index })),
-      ],
     });
 
     return restaurant;

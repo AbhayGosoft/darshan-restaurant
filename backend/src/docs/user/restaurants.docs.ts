@@ -104,10 +104,14 @@
 
 /**
  * @openapi
- * /api/restaurants/{id}/slots:
+ * /api/restaurants/{id}/arrival-window:
  *   get:
- *     tags: ["User: Slots"]
- *     summary: Get available booking slots for a date/party size
+ *     tags: ["User: Arrival"]
+ *     summary: Today's allowed arrival times (orders are same-day only)
+ *     description: >
+ *       Earliest arrival = now + the restaurant's max prep time, rounded up to `stepMinutes` and never before
+ *       opening; latest = closing time. When `isOpen` is false the restaurant takes no more orders today.
+ *       `suggestedTimes` lists every step in between, ready for a time picker.
  *     security:
  *       - ClientKey: []
  *     parameters:
@@ -115,23 +119,30 @@
  *         name: id
  *         required: true
  *         schema: { type: string, format: uuid }
- *       - in: query
- *         name: date
- *         required: true
- *         schema: { type: string, example: "2026-09-20" }
- *       - in: query
- *         name: people
- *         schema: { type: integer, minimum: 1, default: 1 }
  *     responses:
  *       200:
- *         description: Available slots
+ *         description: Arrival window
  *         content:
  *           application/json:
- *             schema: { $ref: "#/components/schemas/SuccessEnvelope" }
+ *             schema:
+ *               allOf:
+ *                 - $ref: "#/components/schemas/SuccessEnvelope"
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         date: { type: string, example: "2026-10-03" }
+ *                         isOpen: { type: boolean }
+ *                         opensAt: { type: string, example: "9:00 AM" }
+ *                         closesAt: { type: string, example: "11:00 PM" }
+ *                         prepTimeMinutes: { type: integer, example: 30 }
+ *                         earliest: { type: string, nullable: true, example: "12:45 PM" }
+ *                         latest: { type: string, nullable: true, example: "11:00 PM" }
+ *                         stepMinutes: { type: integer, example: 15 }
+ *                         suggestedTimes: { type: array, items: { type: string }, example: ["12:45 PM", "1:00 PM", "1:15 PM"] }
  *       404:
  *         $ref: "#/components/responses/NotFound"
- *       422:
- *         $ref: "#/components/responses/ValidationError"
  */
 
 // Table booking disabled — GET /api/restaurants/{id}/tables/availability is turned off for now.
@@ -141,7 +152,10 @@
  * /api/restaurants/{id}/bookings:
  *   post:
  *     tags: ["User: Bookings"]
- *     summary: Create a booking (after payment order creation)
+ *     summary: Place a same-day food order with an arrival time (after payment order creation)
+ *     description: >
+ *       The order starts as `upcoming`. `time` is the arrival time and must be inside today's arrival window
+ *       (see /arrival-window); a 5-minute grace applies because the order is already paid.
  *     security:
  *       - ClientKey: []
  *       - CustomerBearer: []
@@ -156,10 +170,10 @@
  *         application/json:
  *           schema:
  *             type: object
- *             required: [date, time, people, fullName, mobileNumber, preorderItems, payment]
+ *             required: [time, people, fullName, mobileNumber, preorderItems, payment]
  *             properties:
- *               date: { type: string, example: "2026-09-20" }
- *               time: { type: string, example: "07:30 PM" }
+ *               date: { type: string, example: "2026-10-03", description: "Optional — must be today if sent" }
+ *               time: { type: string, example: "1:30 PM", description: "Arrival time" }
  *               people: { type: integer, minimum: 1 }
  *               tablePreference: { type: string, description: "Deprecated (table booking disabled). Optional, defaults to Any Table." }
  *               specialRequest: { type: string, maxLength: 500 }
@@ -187,7 +201,7 @@
  *                   razorpay_payment_id: { type: string }
  *     responses:
  *       201:
- *         description: Booking confirmed
+ *         description: Order placed (status "upcoming")
  *         content:
  *           application/json:
  *             schema: { $ref: "#/components/schemas/SuccessEnvelope" }

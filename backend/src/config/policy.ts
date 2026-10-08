@@ -6,28 +6,24 @@ import { env } from "./env.js";
  * instead of scattering magic numbers across controllers.
  */
 export const policy = {
-  /** Minutes before a booking's slot time after which it can no longer be modified. */
-  modificationCutoffMinutes: env.bookingModificationCutoffMinutes,
-  /** Minutes before a booking's slot time to fire the reminder push. */
+  /** Minutes before the arrival time to fire the reminder push (skipped when that moment has already passed). */
   reminderMinutesBefore: env.bookingReminderMinutesBefore,
   /** Fixed advance amount (INR) charged for every restaurant booking. */
   bookingAdvanceInr: env.restaurantBookingAdvanceInr,
-  /** Furthest a customer may book ahead. */
-  maxBookingLeadDays: 60,
-  /** IANA timezone slot times are expressed in (restaurant wall-clock time). */
+  /** Arrival-time picker granularity: the earliest arrival is rounded up to this, and suggested times step by it. */
+  arrivalStepMinutes: 15,
+  /** Extra minutes a paid booking may still be confirmed after its arrival time became too soon, so a
+   * customer whose payment finished just after the cutoff isn't charged without a booking. */
+  paidBookingGraceMinutes: 5,
+  /** IANA timezone arrival times and opening hours are expressed in (restaurant wall-clock time). */
   businessTimeZone: env.businessTimeZone,
 };
 
 export type RefundDecision = { eligible: boolean; amount: number };
 
 /**
- * Refund policy: full refund of the advance if cancelled more than the
- * modification cutoff before the booked slot; no refund otherwise. This is an
- * explicit initial assumption (documented in README) — change here only.
+ * Refund policy: a customer can only cancel before the food goes into preparation, and the
+ * restaurant cancelling or rejecting is never the customer's fault — so every cancellation or
+ * rejection makes the full amount paid refundable. Change it here only.
  */
-export const decideRefund = (input: { advancePaid: number; slotDateTime: Date; now?: Date }): RefundDecision => {
-  const now = input.now ?? new Date();
-  const minutesUntilSlot = (input.slotDateTime.getTime() - now.getTime()) / 60_000;
-  const eligible = minutesUntilSlot >= policy.modificationCutoffMinutes;
-  return { eligible, amount: eligible ? input.advancePaid : 0 };
-};
+export const decideRefund = (input: { advancePaid: number }): RefundDecision => ({ eligible: true, amount: input.advancePaid });

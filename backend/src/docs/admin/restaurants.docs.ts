@@ -86,6 +86,8 @@
  *               longitude: { type: number, minimum: -180, maximum: 180 }
  *               seatingCapacity: { type: integer, minimum: 1, default: 40 }
  *               maxPartySize: { type: integer, minimum: 1, default: 12 }
+ *               opensAt: { type: string, example: "09:00", default: "09:00", description: "24h HH:mm; earliest arrival time customers can pick" }
+ *               closesAt: { type: string, example: "23:00", default: "23:00", description: "24h HH:mm; latest arrival time, must be after opensAt" }
  *     responses:
  *       201:
  *         description: Restaurant created
@@ -231,7 +233,7 @@
  *   delete:
  *     tags: ["Admin: Restaurants"]
  *     summary: Permanently delete a restaurant (SuperAdmin only)
- *     description: Removes the restaurant with its menus, slots, tables and assignments. If the restaurant has any bookings, it is deactivated instead.
+ *     description: Removes the restaurant with its menus, tables and assignments. If the restaurant has any bookings, it is deactivated instead.
  *     security:
  *       - ClientKey: []
  *       - AdminBearer: []

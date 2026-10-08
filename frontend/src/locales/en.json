@@ -68,7 +68,7 @@
     "tagline": "Restaurant operations, elevated",
     "headlineLine1": "Every table,",
     "headlineLine2": "every booking, in sync.",
-    "intro": "One focused workspace for menus, slots, and reservations across your restaurants.",
+    "intro": "One focused workspace for menus, orders and reservations across your restaurants.",
     "secureTitle": "Secure by design",
     "secureSubtitle": "Enterprise-grade access",
     "welcome": "Welcome back",
@@ -94,7 +94,7 @@
     "currentScope": "Bookings and performance across the current scope",
     "revenue": "Booking revenue",
     "today": "Bookings today",
-    "upcoming": "Upcoming bookings",
+    "upcoming": "Active orders",
     "restaurant": "Restaurant",
     "restaurants": "Restaurants",
     "recent": "Recent bookings",
@@ -105,8 +105,12 @@
     "allStatuses": "All statuses",
     "status": {
       "upcoming": "Upcoming",
-      "past": "Past",
-      "cancelled": "Cancelled"
+      "acknowledged": "Acknowledged",
+      "preparing": "Preparing",
+      "ready": "Ready",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "rejected": "Rejected"
     },
     "cancelReasons": {
       "Change of plans": "Change of plans",
@@ -117,15 +121,16 @@
     },
     "loadError": "Couldn't load bookings",
     "emptyTitle": "No bookings found",
-    "emptyMessage": "Bookings will show up here once customers start placing orders.",
+    "emptyMessage": "Orders will show up here once customers start placing them.",
     "columns": {
       "booking": "Booking",
       "guest": "Guest",
-      "dateTime": "Date & time",
       "items": "Items",
       "people": "People",
       "status": "Status",
-      "paid": "Paid"
+      "paid": "Paid",
+      "arrival": "Arrival",
+      "action": "Next step"
     },
     "previous": "Previous",
     "next": "Next",
@@ -139,7 +144,43 @@
     "refund": "Refund",
     "refundEligible": "₹{{amount}} eligible",
     "refundNotEligible": "Not eligible",
-    "cancelBooking": "Cancel booking"
+    "cancelBooking": "Cancel booking",
+    "searchPlaceholder": "Search name, mobile or booking ID",
+    "fromDate": "From date",
+    "toDate": "To date",
+    "to": "to",
+    "noMatchTitle": "No bookings match these filters",
+    "noMatchMessage": "Try a different date range or status, or clear the filters.",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "sortSoonest": "Soonest first — click for latest first",
+    "sortLatest": "Latest first — click for soonest first",
+    "showingRange": "Showing {{from}}–{{to}} of {{total}}",
+    "perPage": "Rows per page",
+    "perPageOption": "{{count}} / page",
+    "activeStatuses": "Active (not finished)",
+    "actions": {
+      "acknowledged": "Acknowledge",
+      "preparing": "Start preparing",
+      "ready": "Mark ready",
+      "completed": "Complete"
+    },
+    "actionHints": {
+      "upcoming": "Accept the order so the customer knows it's confirmed.",
+      "acknowledged": "Once cooking starts, the customer can no longer cancel.",
+      "preparing": "Let the customer know the food is ready.",
+      "ready": "Complete it after the customer collects the food or finishes eating."
+    },
+    "actors": {
+      "customer": "Customer",
+      "restaurant": "Restaurant"
+    },
+    "arrivalAt": "Arrival {{date}} at {{time}}",
+    "cancelledBy": "Cancelled by",
+    "rejectionReason": "Rejection reason",
+    "noReasonGiven": "No reason given",
+    "rejectReasonPlaceholder": "Reason for rejecting (optional)",
+    "rejectOrder": "Reject order"
   },
   "restaurants": {
     "title": "Restaurants",
@@ -170,7 +211,7 @@
     "deactivateTitle": "Deactivate restaurant?",
     "deactivateMessage": "{{name}} will no longer be available for bookings.",
     "deleteTitle": "Delete restaurant permanently?",
-    "deleteMessage": "{{name}} and its menu, slots and tables will be removed. If it has any bookings, it will be deactivated instead."
+    "deleteMessage": "{{name}} and its menu and tables will be removed. If it has any bookings, it will be deactivated instead."
   },
   "admins": {
     "title": "Admins",
@@ -208,7 +249,6 @@
     "tabs": {
       "general": "General",
       "menu": "Menu",
-      "slots": "Slots",
       "tables": "Tables",
       "categories": "Categories"
     }
@@ -232,7 +272,13 @@
     "state": "State",
     "country": "Country",
     "countryRequired": "Country is required",
-    "pincode": "Pincode"
+    "pincode": "Pincode",
+    "opensAt": "Opens at",
+    "closesAt": "Closes at",
+    "opensAtRequired": "Opening time is required",
+    "closesAtRequired": "Closing time is required",
+    "closesAfterOpens": "Closing time must be after opening time",
+    "openingHoursHint": "Customers can choose an arrival time between these hours, at least the max prep time from now."
   },
   "menu": {
     "title": "Menu",
@@ -264,27 +310,6 @@
     "deleteItemTitle": "Delete menu item permanently?",
     "deleteCategoryMessage": "{{name}} and all its items will be removed. If any item was ordered in a booking, the category will be deactivated instead.",
     "deleteItemMessage": "{{name}} will be removed. If it was ordered in a booking, it will be deactivated instead."
-  },
-  "slots": {
-    "title": "Slots",
-    "loadError": "Couldn't load slots",
-    "add": "Add slot",
-    "edit": "Edit slot",
-    "meals": {
-      "LUNCH": "Lunch",
-      "DINNER": "Dinner"
-    },
-    "noneConfigured": "No {{meal}} slots configured.",
-    "noneDeactivated": "No deactivated {{meal}} slots.",
-    "editAria": "Edit slot",
-    "deleteAria": "Delete slot permanently",
-    "eyebrow": "Slot configuration",
-    "meal": "Meal",
-    "time": "Time",
-    "timeRequired": "Time is required",
-    "slotName": "The {{time}} slot",
-    "deleteTitle": "Delete slot permanently?",
-    "deleteMessage": "The {{time}} {{meal}} slot will be removed. If it has bookings it will be deactivated instead."
   },
   "tables": {
     "title": "Tables",

@@ -26,7 +26,8 @@ describe("slot time conversion", () => {
   it("validates 12h time format", () => {
     expect(isValidTime12("12:00 PM")).toBe(true);
     expect(isValidTime12("9:05 am")).toBe(true);
-    expect(isValidTime12("25:00 PM")).toBe(true); // regex only checks shape, not range
+    expect(isValidTime12("25:00 PM")).toBe(false); // hour must be 1-12
+    expect(isValidTime12("12:60 PM")).toBe(false);
     expect(isValidTime12("noon")).toBe(false);
     expect(isValidTime12("12:00")).toBe(false);
   });

@@ -10,7 +10,8 @@
  *     parameters:
  *       - in: query
  *         name: filter
- *         schema: { type: string, enum: [upcoming, past] }
+ *         description: active = upcoming/acknowledged/preparing/ready; past = completed/cancelled/rejected ("upcoming" is an alias of active)
+ *         schema: { type: string, enum: [active, upcoming, past] }
  *     responses:
  *       200:
  *         description: Bookings

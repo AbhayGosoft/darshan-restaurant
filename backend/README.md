@@ -1,7 +1,7 @@
 # Restaurant Backend API
 
 A standalone Restaurant reservation backend — Firebase phone-auth customers, Razorpay
-booking-advance payments, Restaurant/Menu/Slot management, and Admin/SuperAdmin
+booking-advance payments, Restaurant/Menu management, same-day food orders with an arrival time, and Admin/SuperAdmin
 management APIs. Built with Node.js + Express 5 + TypeScript + Prisma 7 + MySQL/MariaDB.
 
 This backend was transformed from a Hotel/PMS template. It has **no dependency on
@@ -24,7 +24,7 @@ own authentication, database, and business logic end to end.
 src/
   app.ts                Express app + route registration
   server.ts              HTTP server, Redis/socket/worker lifecycle
-  config/                env.ts, policy.ts (modification cutoff, refund policy)
+  config/                env.ts, policy.ts (arrival-time step, paid grace, refund policy)
   lib/                   prisma, firebaseAdmin, razorpay, oneSignal clients
   middleware/auth.ts      Admin JWT, Customer JWT, requireRestaurantAccess, requireClientKey
   constants/               table preference / cancellation reason label maps
@@ -32,15 +32,15 @@ src/
   routes/                  customer-facing routes + routes/admin/* admin routes
   socket/                  Socket.IO server + restaurant:* event names
   queues/, workers/        BullMQ booking-reminder queue/worker
-  utils/                   geo, dates, slot time formatting, human booking id, http envelope
+  utils/                   geo, dates, time formatting, human booking id, http envelope
 prisma/
   schema.prisma            Restaurant domain schema
-  seed.ts                  2 restaurants, SuperAdmin, Admin, menu, slots
+  seed.ts                  2 restaurants, SuperAdmin, Admin, menu
   create-admin.ts          Bootstraps a SuperAdmin from env vars
 tests/
   unit/                    Pure logic (geo, date/time, refund policy, booking id)
   integration/             Mocked-Prisma service + route tests (auth boundaries, IDOR,
-                            booking capacity/cutoff/refund, payment verification, refresh rotation)
+                            order status flow/cancel rules/refund, payment verification, refresh rotation)
 ```
 
 ## Domain Model
@@ -48,8 +48,7 @@ tests/
 `RestaurantUser` (customer, Firebase-authenticated) · `AdminUser` (ADMIN/SUPERADMIN,
 scoped to restaurants via `AdminRestaurant`) · `Restaurant` · `RestaurantCategory` /
 `RestaurantCategoryLink` (admin-manageable taxonomy, e.g. `pure_veg`, `north_indian`) ·
-`MenuCategory` → `MenuItem` · `SlotConfiguration` (Lunch/Dinner time slots, admin
-configurable) · `RestaurantBooking` (snapshots restaurant name/image/rating/cuisine/
+`MenuCategory` → `MenuItem` · `RestaurantBooking` (snapshots restaurant name/image/rating/cuisine/
 distance at booking time so history renders correctly even if the restaurant changes
 later) · `Payment` (Razorpay order/signature verification, independent of whether a
 booking is ever created from it) · `RefreshSession` (rotating customer refresh tokens) ·
@@ -87,13 +86,13 @@ POST   /api/auth/logout/                 Revoke refresh session
 GET    /api/restaurants/                 ?city&category&q&latitude&longitude&page&limit
 GET    /api/restaurants/:id/             ?latitude&longitude (for distanceKm)
 GET    /api/restaurants/:id/menu/
-GET    /api/restaurants/:id/slots/       ?date=YYYY-MM-DD&people=N
+GET    /api/restaurants/:id/arrival-window   today's allowed arrival times
 POST   /api/restaurants/:id/bookings/    [customer auth] verified-payment required
 
 POST   /api/payments/initiate/           [customer auth] server decides the ₹ amount
 POST   /api/payments/verify/             [customer auth] verifies Razorpay HMAC signature
 
-GET    /api/my-restaurant-bookings/      [customer auth] ?filter=upcoming|past
+GET    /api/my-restaurant-bookings/      [customer auth] ?filter=active|past
 GET    /api/restaurant-bookings/:id/     [customer auth, ownership enforced]
 PATCH  /api/restaurant-bookings/:id/     [customer auth] date/time/people only
 POST   /api/restaurant-bookings/:id/cancel/  [customer auth]
@@ -106,7 +105,8 @@ GET/POST/PATCH/DELETE  /api/admin/restaurants/[:id]      [SuperAdmin: all; Admin
 PATCH  /api/admin/restaurants/:id/rating                 [SuperAdmin only]
 GET/POST/PATCH/DELETE  /api/admin/restaurants/:id/menu/categories[/:categoryId]
 POST/PATCH/DELETE       /api/admin/restaurants/:id/menu/categories/:categoryId/items[/:itemId]
-GET/POST/PATCH/DELETE  /api/admin/restaurants/:id/slots[/:slotId]
+POST   /api/admin/bookings/:id/status   { status: acknowledged|preparing|ready|completed }
+POST   /api/admin/bookings/:id/reject   { reason? }   (only while upcoming)
 GET/PATCH/DELETE        /api/admin/bookings[/:id][/cancel]
 GET/POST/PATCH/DELETE  /api/admin/admins[/:id]           [SuperAdmin only]
 GET/POST/PATCH/DELETE  /api/admin/categories[/:id]        (global category taxonomy; SuperAdmin writes)
@@ -126,34 +126,41 @@ convention).
 marks the `Payment` row `VERIFIED`; a signature mismatch marks it `FAILED` and a second
 verify attempt on an already-verified/failed order is rejected. Only then does
 `POST /restaurants/:id/bookings/` accept the booking — it re-validates the payment
-belongs to the caller and hasn't already funded a different booking, then, **inside a
-transaction that row-locks the restaurant (`SELECT ... FOR UPDATE`)**, re-checks slot
-capacity before inserting — closing the race window between the `/slots/` read and the
-booking write so two concurrent bookers can't both claim the last seats.
+belongs to the caller and hasn't already funded a different booking, checks the arrival
+time against today's window, and inserts the order as `upcoming`. There is no capacity
+limit — the restaurant controls load by acknowledging or rejecting orders.
 
 ## Reminders & Notifications
 
 Booking confirm/modify/cancel notifications are created (and pushed via OneSignal, and
 emitted over `restaurant:notification:new` on the customer's socket room) synchronously
-within the request. Slot-time reminders are scheduled as a **delayed BullMQ job**
-(`BOOKING_REMINDER_MINUTES_BEFORE` before the slot), rescheduled on modify and cancelled
-on cancel — not a per-booking `setTimeout`, so reminders survive process restarts.
+within the request, and so is a push for every status change (acknowledged, preparing,
+ready, completed, cancelled, rejected). Arrival reminders are scheduled as a **delayed BullMQ
+job** (`BOOKING_REMINDER_MINUTES_BEFORE` before the arrival time; skipped if that moment has
+already passed), rescheduled on modify and cancelled on cancel/reject/complete — not a
+per-booking `setTimeout`, so reminders survive process restarts.
 
-## Modification / Cancellation Policy
+## Orders: Arrival Time, Status Flow, Cancellation
 
-Centralized in `src/config/policy.ts`, not scattered across controllers:
+Rules live in `src/config/policy.ts`, `src/constants/bookingStatus.ts` and
+`src/services/arrivalService.ts`, not scattered across controllers:
 
-- **Modification window**: `BOOKING_MODIFICATION_CUTOFF_MINUTES` (default 60) before the
-  slot time; PATCH is rejected once inside that window.
-- **Refund policy**: full refund of the advance if cancelled outside the same cutoff
-  window, no refund inside it. This is an explicit initial assumption — change it in one
-  place (`decideRefund`) if the real business rule differs.
-- **Booking window**: today through `maxBookingLeadDays` (60) days out, validated
-  server-side on both slot lookup and booking creation/modification.
+- **Same-day only, arrival time instead of slots**: the customer picks an arrival time for
+  today. Earliest = now + the restaurant's `prepTimeMax` (rounded up to `arrivalStepMinutes`,
+  15); latest = the restaurant's closing time (`opensAt`/`closesAt`, set in General settings).
+  Booking creation (which always carries a verified payment) gets `paidBookingGraceMinutes`
+  (5) extra, so a customer who paid right at the cutoff isn't charged without an order.
+- **Status flow**: `upcoming` → `acknowledged` → `preparing` → `ready` → `completed`, one step at
+  a time, moved by the restaurant (`POST /admin/bookings/:id/status`).
+- **Cancel**: the customer can cancel while `upcoming` or `acknowledged` — not once the food is
+  `preparing`. The restaurant can cancel any order that isn't completed.
+- **Reject**: restaurant only, and only while the order is still `upcoming`.
+- **Modify**: arrival time / party size can change only while `upcoming`.
+- **Refund policy**: every cancellation or rejection marks the full amount paid as refundable
+  (`decideRefund`). The refund itself is not sent to Razorpay automatically.
 
-`upcoming` → `past` is computed on every read (comparing the booking's date+time against
-the current instant), not written by a cron job — so it can never go stale regardless of
-when a client last fetched it.
+Every status change is a single conditional `UPDATE ... WHERE status IN (...)`, so a customer
+cancelling while the restaurant starts preparing can never both succeed.
 
 ## Environment Variables
 
@@ -189,7 +196,7 @@ cp .env.example .env         # fill in DATABASE_URL at minimum; Firebase/Razorpa
 npm install
 npm run prisma:generate
 npm run prisma:migrate        # applies prisma/migrations/20260822000000_init
-npm run db:seed               # 2 restaurants, SuperAdmin, Admin, menu, slots
+npm run db:seed               # 2 restaurants, SuperAdmin, Admin, menu
 npm run dev                   # http://localhost:4000
 ```
 
@@ -215,7 +222,7 @@ Tests never touch a real database — Prisma is mocked (`tests/helpers/mockPrism
 the suite is hermetic and fast. Coverage includes: cross-audience token rejection (a
 customer token can't be replayed on an admin route or vice versa), IDOR protection on
 booking access, SuperAdmin-only route enforcement, refresh-token rotation and reuse
-detection, booking capacity/date-window/cutoff/refund logic, and Razorpay
+detection, arrival-window, order status flow, cancel/reject/refund logic, and Razorpay
 signature/duplicate-verification handling.
 
 ## Example Requests

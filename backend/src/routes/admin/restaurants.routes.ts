@@ -5,6 +5,7 @@ import { requireAdminAuth, requireRestaurantAccess, requireSuperAdmin } from "..
 import { imageUrlSchema, resolveAssetUrl } from "../../utils/images.js";
 import { ApiError, asyncHandler, idParam, sendSuccess, validateBody, validateQuery } from "../../utils/http.js";
 import { pagination } from "../../utils/query.js";
+import { isValidTime24, toMinutes } from "../../utils/slotTime.js";
 
 // OpenAPI docs: src/docs/admin/restaurants.docs.ts
 const router = Router();
@@ -38,6 +39,8 @@ const toAdminRestaurant = (restaurant: any) => ({
   longitude: Number(restaurant.longitude),
   seatingCapacity: restaurant.seatingCapacity,
   maxPartySize: restaurant.maxPartySize,
+  opensAt: restaurant.opensAt,
+  closesAt: restaurant.closesAt,
   status: restaurant.status,
   createdAt: restaurant.createdAt,
 });
@@ -114,12 +117,21 @@ const createSchema = z.object({
   longitude: z.coerce.number().min(-180).max(180),
   seatingCapacity: z.coerce.number().int().min(1).default(40),
   maxPartySize: z.coerce.number().int().min(1).default(12),
+  /** Daily opening hours, 24h "HH:mm"; customers can only pick arrival times inside them. */
+  opensAt: z.string().refine(isValidTime24, { message: 'opensAt must look like "09:00"' }).optional(),
+  closesAt: z.string().refine(isValidTime24, { message: 'closesAt must look like "23:00"' }).optional(),
 });
+
+const assertOpeningHours = (opensAt: string, closesAt: string) => {
+  if (toMinutes(closesAt) <= toMinutes(opensAt)) throw new ApiError(422, "Closing time must be after opening time.");
+};
 
 router.post(
   "/",
   asyncHandler(async (req, res) => {
     const body = validateBody(createSchema, req.body);
+    // Unset hours fall back to the column defaults (09:00–23:00).
+    assertOpeningHours(body.opensAt ?? "09:00", body.closesAt ?? "23:00");
     const { categoryIds, adminId, ...rest } = body;
 
     const assignedAdminIds =
@@ -161,6 +173,11 @@ router.patch(
   asyncHandler(async (req, res) => {
     const id = idParam(req);
     const body = validateBody(updateSchema, req.body);
+    if (body.opensAt || body.closesAt) {
+      const current = await prisma.restaurant.findUnique({ where: { id }, select: { opensAt: true, closesAt: true } });
+      if (!current) throw new ApiError(404, "Restaurant not found");
+      assertOpeningHours(body.opensAt ?? current.opensAt, body.closesAt ?? current.closesAt);
+    }
     const { categoryIds, ...rest } = body;
 
     if (categoryIds) {
@@ -203,7 +220,7 @@ router.delete(
 );
 
 // Hard delete (SuperAdmin only). A restaurant with any bookings is deactivated instead so
-// booking/payment history stays intact; otherwise menus, slots, tables and links cascade away.
+// booking/payment history stays intact; otherwise menus, tables and links cascade away.
 router.delete(
   "/:id/permanent",
   requireSuperAdmin,

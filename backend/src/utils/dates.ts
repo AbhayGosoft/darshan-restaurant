@@ -33,15 +33,14 @@ export const startOfBusinessToday = (now = new Date()): Date => {
   return new Date(Date.UTC(year, month - 1, day));
 };
 
-/** A booking date must be today or later, and no further than the configured lead window. */
-export const isWithinBookingWindow = (date: Date, now = new Date()): boolean => {
-  const today = startOfBusinessToday(now);
-  const maxDate = new Date(today);
-  maxDate.setUTCDate(maxDate.getUTCDate() + policy.maxBookingLeadDays);
-  return date.getTime() >= today.getTime() && date.getTime() <= maxDate.getTime();
+/** Current business-timezone date (UTC-midnight Date) and "HH:mm" wall-clock time — the same shape
+ * bookings store, so they can be compared directly in database queries. */
+export const businessNow = (now = new Date()) => {
+  const { year, month, day, hour, minute } = zonedParts(now);
+  return { date: new Date(Date.UTC(year, month - 1, day)), time: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}` };
 };
 
-/** Combines a DATE-only value with a "h:mm AM/PM" or "HH:mm" slot time (restaurant wall-clock time
+/** Combines a DATE-only value with a "h:mm AM/PM" or "HH:mm" time (restaurant wall-clock time
  * in the business timezone) into the real instant it refers to. */
 export const combineDateAndTime = (date: Date, time: string): Date => {
   const time24 = /am|pm/i.test(time) ? to24Hour(time) : time;
@@ -51,7 +50,3 @@ export const combineDateAndTime = (date: Date, time: string): Date => {
   const offsetMs = Date.UTC(seen.year, seen.month - 1, seen.day, seen.hour, seen.minute, seen.second) - wallClockAsUtc;
   return new Date(wallClockAsUtc - offsetMs);
 };
-
-/** True once a slot's start time has already passed — such slots can no longer be booked. */
-export const isSlotInPast = (date: Date, time: string, now = new Date()): boolean =>
-  combineDateAndTime(date, time).getTime() <= now.getTime();

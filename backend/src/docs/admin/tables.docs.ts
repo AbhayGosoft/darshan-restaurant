@@ -71,7 +71,7 @@
  *   get:
  *     tags: ["Admin: Tables"]
  *     summary: Check which physical tables are free for a date/time/party size
- *     description: Independent of the slot grid — useful for walk-ins or manual booking assignment.
+ *     description: Useful for walk-ins or manual table assignment (customer table booking is disabled).
  *     security:
  *       - ClientKey: []
  *       - AdminBearer: []
@@ -96,7 +96,7 @@
  *         schema: { type: string, enum: [Any Table, Window Seat, Indoor Seat, Outdoor Seat] }
  *     responses:
  *       200:
- *         description: Table availability for the requested slot
+ *         description: Table availability for the requested date and time
  *         content:
  *           application/json:
  *             schema: { $ref: "#/components/schemas/SuccessEnvelope" }

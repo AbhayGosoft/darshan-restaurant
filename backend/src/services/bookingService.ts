@@ -1,29 +1,36 @@
-import type { RestaurantBooking } from "../../generated/prisma/client.js";
+import type { BookingStatus, NotificationType, Prisma, RestaurantBooking } from "../../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
 import { getActiveRestaurantOrThrow } from "./restaurantService.js";
-import { getBookedSeatCount } from "./slotService.js";
-// Table booking flow is disabled for now — bookings are capacity-based menu orders.
-// import { findAvailableTable } from "./slotService.js";
+import { assertArrivalTime } from "./arrivalService.js";
+// Table booking flow is disabled for now — bookings are menu orders with an arrival time.
+// import { findAvailableTable } from "./tableService.js";
 import { calculateMenuTotal } from "./paymentService.js";
 import { cancelReminder, scheduleReminder } from "../queues/reminderQueue.js";
 import { notifyCustomer } from "./notificationService.js";
-import { emitToRestaurant } from "../socket/server.js";
+import { emitToCustomer, emitToRestaurant } from "../socket/server.js";
 import { socketEvents } from "../socket/socketEvents.js";
 import { policy, decideRefund } from "../config/policy.js";
 import { ApiError } from "../utils/http.js";
 import { resolveAssetUrl } from "../utils/images.js";
-import { combineDateAndTime, formatDateOnly, isSlotInPast, isWithinBookingWindow, parseDateOnly } from "../utils/dates.js";
+import { businessNow, combineDateAndTime, formatDateOnly, parseDateOnly } from "../utils/dates.js";
 import { isValidTime12, to12Hour, to24Hour } from "../utils/slotTime.js";
 import { generateHumanBookingId } from "../utils/bookingId.js";
 import { haversineDistanceKm } from "../utils/geo.js";
 import { CANCELLATION_REASON_BY_LABEL, CANCELLATION_REASON_LABELS, TABLE_PREFERENCE_BY_LABEL, TABLE_PREFERENCE_LABELS } from "../constants/bookingOptions.js";
+import {
+  ACTIVE_BOOKING_STATUSES,
+  CLOSED_BOOKING_STATUSES,
+  CUSTOMER_CANCELLABLE_STATUSES,
+  CUSTOMER_MODIFIABLE_STATUSES,
+  NEXT_BOOKING_STATUS,
+  REJECTABLE_STATUSES,
+  RESTAURANT_CANCELLABLE_STATUSES,
+  fromClientStatus,
+  toClientStatus,
+  type BookingClientStatus,
+} from "../constants/bookingStatus.js";
 
-export type BookingClientStatus = "upcoming" | "past" | "cancelled";
-
-const deriveClientStatus = (booking: Pick<RestaurantBooking, "status" | "date" | "time">): BookingClientStatus => {
-  if (booking.status === "CANCELLED") return "cancelled";
-  return combineDateAndTime(booking.date, booking.time).getTime() < Date.now() ? "past" : "upcoming";
-};
+export type { BookingClientStatus } from "../constants/bookingStatus.js";
 
 export const toBookingResponse = (booking: RestaurantBooking & { table?: any; preorder?: any }) => ({
   id: booking.id,
@@ -34,6 +41,7 @@ export const toBookingResponse = (booking: RestaurantBooking & { table?: any; pr
   rating: Number(booking.ratingSnapshot),
   cuisineLabel: booking.cuisineLabelSnapshot,
   distanceKm: booking.distanceKmSnapshot !== null ? Number(booking.distanceKmSnapshot) : null,
+  /** Arrival date and time. */
   date: formatDateOnly(booking.date),
   time: to12Hour(booking.time),
   people: booking.people,
@@ -42,19 +50,35 @@ export const toBookingResponse = (booking: RestaurantBooking & { table?: any; pr
   fullName: booking.fullName,
   mobileNumber: booking.mobileNumber,
   email: booking.email ?? "",
-  status: deriveClientStatus(booking),
+  status: toClientStatus(booking.status),
+  /** What the customer may still do — lets the app show/hide buttons without duplicating the rules. */
+  canCancel: CUSTOMER_CANCELLABLE_STATUSES.includes(booking.status),
+  canModify: CUSTOMER_MODIFIABLE_STATUSES.includes(booking.status),
   cancellationReason: booking.cancellationReason ? CANCELLATION_REASON_LABELS[booking.cancellationReason] : null,
+  cancelledBy: booking.cancelledBy ? (booking.cancelledBy.toLowerCase() as "customer" | "restaurant") : null,
+  rejectionReason: booking.rejectionReason ?? null,
+  statusTimestamps: {
+    createdAt: booking.createdAt,
+    acknowledgedAt: booking.acknowledgedAt ?? null,
+    preparingAt: booking.preparingAt ?? null,
+    readyAt: booking.readyAt ?? null,
+    completedAt: booking.completedAt ?? null,
+    cancelledAt: booking.cancelledAt ?? null,
+    rejectedAt: booking.rejectedAt ?? null,
+  },
   advancePaid: Number(booking.advancePaid),
   table: booking.table ? { id: booking.table.id, name: booking.table.name, capacity: booking.table.capacity, preference: booking.table.preference, section: booking.table.section } : null,
   preorder: booking.preorder ? { id: booking.preorder.id, subtotal: Number(booking.preorder.subtotal), total: Number(booking.preorder.total), items: booking.preorder.items?.map((item: any) => ({ id: item.id, menuItemId: item.menuItemId, name: item.itemName, unitPrice: Number(item.unitPrice), quantity: item.quantity, note: item.note, lineTotal: Number(item.lineTotal) })) ?? [] } : null,
   refund:
-    booking.status === "CANCELLED"
+    booking.status === "CANCELLED" || booking.status === "REJECTED"
       ? { eligible: booking.refundEligible ?? false, amount: booking.refundAmount ? Number(booking.refundAmount) : 0 }
       : undefined,
 });
 
 export type CreateBookingInput = {
-  date: string;
+  /** Optional — orders are same-day only; when sent it must be today's date. */
+  date?: string;
+  /** Arrival time, "h:mm AM/PM". */
   time: string;
   people: number;
   /** Table booking disabled — optional, defaults to "Any Table". */
@@ -87,15 +111,16 @@ const preparePreorder = async (client: any, restaurantId: string, items: CreateB
   });
 };
 
-const assertValidDate = (value: string) => {
+/** Orders are same-day only: an explicitly sent date must be today's (business timezone) date. */
+const assertToday = (value: string | undefined) => {
+  if (value === undefined) return;
   let date: Date;
   try {
     date = parseDateOnly(value);
   } catch {
     throw new ApiError(422, "Invalid date. Use YYYY-MM-DD format.");
   }
-  if (!isWithinBookingWindow(date)) throw new ApiError(422, "Date must be between today and 60 days from now.");
-  return date;
+  if (date.getTime() !== businessNow().date.getTime()) throw new ApiError(422, "Orders can only be placed for today.");
 };
 
 const assertValidTime = (value: string) => {
@@ -103,14 +128,20 @@ const assertValidTime = (value: string) => {
   return to24Hour(value);
 };
 
+/** Reminder push before arrival; skipped when that moment has already passed (short-notice orders). */
+const scheduleArrivalReminder = async (bookingId: string, date: Date, time24: string) => {
+  const reminderAt = new Date(combineDateAndTime(date, time24).getTime() - policy.reminderMinutesBefore * 60_000);
+  if (reminderAt.getTime() <= Date.now()) return null;
+  return scheduleReminder(bookingId, reminderAt);
+};
+
 export const createBooking = async (customerId: string, restaurantId: string, input: CreateBookingInput) => {
   const restaurant = await getActiveRestaurantOrThrow(restaurantId);
-  const date = assertValidDate(input.date);
+  assertToday(input.date);
   const time24 = assertValidTime(input.time);
-  if (isSlotInPast(date, time24)) throw new ApiError(422, "This slot time has already passed. Please choose a later slot.");
-
-  const slot = await prisma.slotConfiguration.findFirst({ where: { restaurantId, time: time24, isActive: true } });
-  if (!slot) throw new ApiError(422, "Selected slot is not available for this restaurant.");
+  // Creating a booking always requires a verified payment, so the arrival time gets a short grace
+  // period: a customer who picked a valid time and paid just after it became too soon still gets their order.
+  const date = assertArrivalTime(restaurant, time24, { graceMinutes: policy.paidBookingGraceMinutes });
 
   if (!Number.isInteger(input.people) || input.people < 1 || input.people > restaurant.maxPartySize) {
     throw new ApiError(422, `people must be between 1 and ${restaurant.maxPartySize}.`);
@@ -141,14 +172,6 @@ export const createBooking = async (customerId: string, restaurantId: string, in
       : null;
 
   const booking = await prisma.$transaction(async (tx) => {
-    // Row lock on the restaurant serializes concurrent booking attempts for the same
-    // restaurant/date/time so the capacity re-check below can't race.
-    await tx.$queryRaw`SELECT id FROM restaurants WHERE id = ${restaurantId} FOR UPDATE`;
-    // Table booking disabled — capacity-only check.
-    // const selection = await findAvailableTable(tx, { restaurantId, date, time: time24, people: input.people, preference: tablePreference, tableId: input.tableId });
-    // if (selection.hasTables && !selection.table) throw new ApiError(409, "No suitable table is available for this slot.");
-    const booked = await getBookedSeatCount(tx, { restaurantId, date, time: time24 });
-    if (restaurant.seatingCapacity - booked < input.people) throw new ApiError(409, "Selected slot no longer has enough capacity.");
     const preorderItems = await preparePreorder(tx, restaurantId, input.preorderItems);
     return tx.restaurantBooking.create({
       data: {
@@ -177,8 +200,7 @@ export const createBooking = async (customerId: string, restaurantId: string, in
     });
   });
 
-  const reminderAt = new Date(combineDateAndTime(date, time24).getTime() - policy.reminderMinutesBefore * 60_000);
-  const reminderJobId = await scheduleReminder(booking.id, reminderAt);
+  const reminderJobId = await scheduleArrivalReminder(booking.id, date, time24);
   if (reminderJobId) {
     await prisma.restaurantBooking.update({ where: { id: booking.id }, data: { reminderJobId } });
   }
@@ -187,23 +209,23 @@ export const createBooking = async (customerId: string, restaurantId: string, in
     restaurantUserId: customerId,
     type: "BOOKING_CONFIRMED",
     bookingId: booking.id,
-    title: "Booking confirmed",
-    body: `Your booking at ${restaurant.name} on ${input.date} at ${input.time} is confirmed.`,
+    title: "Order placed",
+    body: `Your order ${booking.humanBookingId} at ${restaurant.name} is placed for arrival at ${to12Hour(time24)} today. We'll let you know once the restaurant accepts it.`,
   });
   emitToRestaurant(restaurantId, socketEvents.bookingNew, booking);
 
   return toBookingResponse(booking);
 };
 
-export const listMyBookings = async (customerId: string, filter?: "upcoming" | "past") => {
+/** "active" = still in progress, "past" = completed, cancelled or rejected. "upcoming" is accepted as an alias of "active". */
+export const listMyBookings = async (customerId: string, filter?: "active" | "upcoming" | "past") => {
+  const statusFilter = !filter ? {} : { status: { in: filter === "past" ? CLOSED_BOOKING_STATUSES : ACTIVE_BOOKING_STATUSES } };
   const bookings = await prisma.restaurantBooking.findMany({
-    where: { restaurantUserId: customerId },
-    orderBy: [{ date: "desc" }, { time: "desc" }],
+    where: { restaurantUserId: customerId, ...statusFilter },
+    orderBy: [{ date: "desc" }, { time: "desc" }, { createdAt: "desc" }],
     include: bookingInclude,
   });
-  const mapped = bookings.map(toBookingResponse);
-  if (!filter) return mapped;
-  return mapped.filter((booking) => (filter === "upcoming" ? booking.status === "upcoming" : booking.status !== "upcoming"));
+  return bookings.map(toBookingResponse);
 };
 
 export const getBookingForCustomer = async (customerId: string, id: string) => {
@@ -215,67 +237,82 @@ export const getBookingForCustomer = async (customerId: string, id: string) => {
 
 export type ModifyBookingInput = { date?: string; time?: string; people?: number };
 
+/** Customers may change arrival time / party size until the restaurant acknowledges the order. */
 export const modifyBooking = async (customerId: string, id: string, input: ModifyBookingInput) => {
   const existing = await prisma.restaurantBooking.findUnique({ where: { id } });
   if (!existing) throw new ApiError(404, "Booking not found");
   if (existing.restaurantUserId !== customerId) throw new ApiError(403, "You do not have access to this booking");
-  if (existing.status === "CANCELLED") throw new ApiError(409, "Cancelled bookings cannot be modified");
-
-  const currentSlotDateTime = combineDateAndTime(existing.date, existing.time);
-  if (currentSlotDateTime.getTime() < Date.now()) throw new ApiError(409, "Past bookings cannot be modified");
-
-  const minutesUntilSlot = (currentSlotDateTime.getTime() - Date.now()) / 60_000;
-  if (minutesUntilSlot < policy.modificationCutoffMinutes) {
-    throw new ApiError(409, `Bookings can only be modified up to ${policy.modificationCutoffMinutes} minutes before the slot time.`);
+  if (!CUSTOMER_MODIFIABLE_STATUSES.includes(existing.status)) {
+    throw new ApiError(409, "This order can no longer be changed because the restaurant has already accepted it.");
   }
 
   const restaurant = await getActiveRestaurantOrThrow(existing.restaurantId);
-  const nextDate = input.date ? assertValidDate(input.date) : existing.date;
+  assertToday(input.date);
   const nextTime24 = input.time ? assertValidTime(input.time) : existing.time;
-
-  const slot = await prisma.slotConfiguration.findFirst({ where: { restaurantId: existing.restaurantId, time: nextTime24, isActive: true } });
-  if (!slot) throw new ApiError(422, "Selected slot is not available for this restaurant.");
+  const nextDate = input.time ? assertArrivalTime(restaurant, nextTime24) : existing.date;
 
   const nextPeople = input.people ?? existing.people;
   if (!Number.isInteger(nextPeople) || nextPeople < 1 || nextPeople > restaurant.maxPartySize) {
     throw new ApiError(422, `people must be between 1 and ${restaurant.maxPartySize}.`);
   }
 
-  const newSlotDateTime = combineDateAndTime(nextDate, nextTime24);
-  if (newSlotDateTime.getTime() < Date.now()) throw new ApiError(422, "Cannot move a booking into the past.");
-
-  const updated = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM restaurants WHERE id = ${existing.restaurantId} FOR UPDATE`;
-    const booked = await getBookedSeatCount(tx, {
-      restaurantId: existing.restaurantId,
-      date: nextDate,
-      time: nextTime24,
-      excludeBookingId: existing.id,
-    });
-    if (restaurant.seatingCapacity - booked < nextPeople) {
-      throw new ApiError(409, "Selected slot no longer has enough capacity.");
-    }
-    // Table booking disabled — capacity check above is the only availability rule.
-    // const selection = await findAvailableTable(tx, { restaurantId: existing.restaurantId, date: nextDate, time: nextTime24, people: nextPeople, preference: existing.tablePreference, tableId: existing.tableId ?? undefined, excludeBookingId: existing.id });
-    // if (selection.hasTables && !selection.table) throw new ApiError(409, "No suitable table is available for this slot.");
-    return tx.restaurantBooking.update({ where: { id }, data: { date: nextDate, time: nextTime24, people: nextPeople }, include: bookingInclude });
+  // Guarded on the status so a restaurant acknowledging at the same moment wins cleanly.
+  const result = await prisma.restaurantBooking.updateMany({
+    where: { id, status: { in: CUSTOMER_MODIFIABLE_STATUSES } },
+    data: { date: nextDate, time: nextTime24, people: nextPeople },
   });
+  if (result.count === 0) throw new ApiError(409, "This order can no longer be changed because the restaurant has already accepted it.");
+  const updated = await prisma.restaurantBooking.findUniqueOrThrow({ where: { id }, include: bookingInclude });
 
-  await cancelReminder(existing.reminderJobId);
-  const reminderAt = new Date(newSlotDateTime.getTime() - policy.reminderMinutesBefore * 60_000);
-  const reminderJobId = await scheduleReminder(updated.id, reminderAt);
-  await prisma.restaurantBooking.update({ where: { id: updated.id }, data: { reminderJobId } });
+  if (nextTime24 !== existing.time) {
+    await cancelReminder(existing.reminderJobId);
+    const reminderJobId = await scheduleArrivalReminder(updated.id, nextDate, nextTime24);
+    await prisma.restaurantBooking.update({ where: { id: updated.id }, data: { reminderJobId } });
+  }
 
   await notifyCustomer({
     restaurantUserId: customerId,
     type: "BOOKING_MODIFIED",
     bookingId: updated.id,
-    title: "Booking updated",
-    body: `Your booking ${updated.humanBookingId} has been updated to ${formatDateOnly(nextDate)} at ${to12Hour(nextTime24)}.`,
+    title: "Order updated",
+    body: `Your order ${updated.humanBookingId} is now for ${updated.people} ${updated.people === 1 ? "person" : "people"}, arriving at ${to12Hour(nextTime24)} today.`,
   });
   emitToRestaurant(existing.restaurantId, socketEvents.bookingModified, updated);
 
   return toBookingResponse(updated);
+};
+
+type StatusChange = {
+  from: BookingStatus[];
+  to: BookingStatus;
+  /** Message when the booking isn't in one of `from`. */
+  conflictMessage: (current: BookingStatus) => string;
+  data?: Prisma.RestaurantBookingUpdateManyMutationInput;
+};
+
+/**
+ * Moves a booking to a new status only if it is still in one of the allowed `from` statuses.
+ * The check and the write are a single conditional UPDATE, so a customer cancelling while the
+ * restaurant starts preparing can never both succeed.
+ */
+const applyStatusChange = async (existing: RestaurantBooking, change: StatusChange) => {
+  if (!change.from.includes(existing.status)) throw new ApiError(409, change.conflictMessage(existing.status));
+  const result = await prisma.restaurantBooking.updateMany({
+    where: { id: existing.id, status: { in: change.from } },
+    data: { status: change.to, ...change.data },
+  });
+  if (result.count === 0) {
+    const latest = await prisma.restaurantBooking.findUnique({ where: { id: existing.id }, select: { status: true } });
+    throw new ApiError(409, change.conflictMessage(latest?.status ?? existing.status));
+  }
+  return prisma.restaurantBooking.findUniqueOrThrow({ where: { id: existing.id }, include: bookingInclude });
+};
+
+/** Push + realtime fan-out after any status change. */
+const announceStatusChange = async (booking: RestaurantBooking, notification: { type: NotificationType; title: string; body: string }) => {
+  await notifyCustomer({ restaurantUserId: booking.restaurantUserId, bookingId: booking.id, ...notification });
+  emitToRestaurant(booking.restaurantId, socketEvents.bookingStatusChanged, booking);
+  emitToCustomer(booking.restaurantUserId, socketEvents.customerBookingUpdated, toBookingResponse(booking));
 };
 
 export const cancelBooking = async (customerId: string, id: string, reasonLabel: string) => {
@@ -285,49 +322,73 @@ export const cancelBooking = async (customerId: string, id: string, reasonLabel:
   const existing = await prisma.restaurantBooking.findUnique({ where: { id } });
   if (!existing) throw new ApiError(404, "Booking not found");
   if (existing.restaurantUserId !== customerId) throw new ApiError(403, "You do not have access to this booking");
-  if (existing.status === "CANCELLED") throw new ApiError(409, "Booking is already cancelled");
 
-  const slotDateTime = combineDateAndTime(existing.date, existing.time);
-  if (slotDateTime.getTime() < Date.now()) throw new ApiError(409, "Past bookings cannot be cancelled");
-
-  const refund = decideRefund({ advancePaid: Number(existing.advancePaid), slotDateTime });
-
-  const updated = await prisma.restaurantBooking.update({
-    where: { id },
-    data: {
-      status: "CANCELLED",
-      cancellationReason: reason,
-      cancelledAt: new Date(),
-      refundEligible: refund.eligible,
-      refundAmount: refund.amount,
-    },
+  const refund = decideRefund({ advancePaid: Number(existing.advancePaid) });
+  const updated = await applyStatusChange(existing, {
+    from: CUSTOMER_CANCELLABLE_STATUSES,
+    to: "CANCELLED",
+    conflictMessage: (current) =>
+      current === "CANCELLED" ? "Booking is already cancelled"
+        : current === "PREPARING" || current === "READY" ? "Your food is already being prepared, so this order can't be cancelled now."
+          : `This order is ${toClientStatus(current)} and can't be cancelled.`,
+    data: { cancellationReason: reason, cancelledAt: new Date(), cancelledBy: "CUSTOMER", refundEligible: refund.eligible, refundAmount: refund.amount },
   });
 
   await cancelReminder(existing.reminderJobId);
-  await notifyCustomer({
-    restaurantUserId: customerId,
-    type: "BOOKING_CANCELLED",
-    bookingId: updated.id,
-    title: "Booking cancelled",
-    body: `Your booking ${updated.humanBookingId} has been cancelled.`,
-  });
+  await announceStatusChange(updated, { type: "BOOKING_CANCELLED", title: "Order cancelled", body: `Your order ${updated.humanBookingId} has been cancelled.` });
   emitToRestaurant(existing.restaurantId, socketEvents.bookingCancelled, updated);
 
   return { booking: toBookingResponse(updated), refund };
 };
 
-export const listBookingsForAdmin = async (input: { restaurantId?: string; restaurantIds?: string[]; status?: BookingClientStatus; page: number; limit: number }) => {
-  const bookings = await prisma.restaurantBooking.findMany({
-    where: input.restaurantId ? { restaurantId: input.restaurantId } : input.restaurantIds ? { restaurantId: { in: input.restaurantIds } } : {},
-    orderBy: [{ date: "desc" }, { time: "desc" }],
-    include: bookingInclude,
-  });
-  let mapped = bookings.map(toBookingResponse);
-  if (input.status) mapped = mapped.filter((booking) => booking.status === input.status);
+export type AdminBookingListInput = {
+  restaurantId?: string;
+  restaurantIds?: string[];
+  /** A single status, or "active" for every order still in progress. */
+  status?: BookingClientStatus | "active";
+  /** Inclusive "YYYY-MM-DD" bounds on the arrival date. */
+  from?: string;
+  to?: string;
+  /** Matches guest name, mobile number or booking ID. */
+  search?: string;
+  /** By arrival date + time; "asc" puts the soonest bookings first. Defaults to "desc" (latest first). */
+  sort?: "asc" | "desc";
+  page: number;
+  limit: number;
+};
 
-  const total = mapped.length;
-  const start = (input.page - 1) * input.limit;
-  return { bookings: mapped.slice(start, start + input.limit), total };
+/** Filtering, sorting and pagination all run in the database. */
+export const listBookingsForAdmin = async (input: AdminBookingListInput) => {
+  const parseBound = (value: string) => {
+    try {
+      return parseDateOnly(value);
+    } catch {
+      throw new ApiError(422, "Invalid date. Use YYYY-MM-DD format.");
+    }
+  };
+  const search = input.search?.trim();
+
+  const where: Prisma.RestaurantBookingWhereInput = {
+    AND: [
+      input.restaurantId ? { restaurantId: input.restaurantId } : input.restaurantIds ? { restaurantId: { in: input.restaurantIds } } : {},
+      input.status === "active" ? { status: { in: ACTIVE_BOOKING_STATUSES } } : input.status ? { status: fromClientStatus(input.status) } : {},
+      input.from || input.to ? { date: { ...(input.from ? { gte: parseBound(input.from) } : {}), ...(input.to ? { lte: parseBound(input.to) } : {}) } } : {},
+      search ? { OR: [{ fullName: { contains: search } }, { mobileNumber: { contains: search } }, { humanBookingId: { contains: search } }] } : {},
+    ],
+  };
+  const direction = input.sort ?? "desc";
+
+  const [bookings, total] = await Promise.all([
+    prisma.restaurantBooking.findMany({
+      where,
+      orderBy: [{ date: direction }, { time: direction }, { createdAt: direction }],
+      skip: (input.page - 1) * input.limit,
+      take: input.limit,
+      include: bookingInclude,
+    }),
+    prisma.restaurantBooking.count({ where }),
+  ]);
+  return { bookings: bookings.map(toBookingResponse), total };
 };
 
 export const getBookingForAdmin = async (id: string) => {
@@ -340,9 +401,7 @@ const assertPreorderEditable = async (customerId: string, bookingId: string) => 
   const booking = await prisma.restaurantBooking.findUnique({ where: { id: bookingId }, include: bookingInclude });
   if (!booking) throw new ApiError(404, "Booking not found");
   if (booking.restaurantUserId !== customerId) throw new ApiError(403, "You do not have access to this booking");
-  if (booking.status === "CANCELLED") throw new ApiError(409, "Cancelled bookings cannot be changed");
-  const minutesUntilSlot = (combineDateAndTime(booking.date, booking.time).getTime() - Date.now()) / 60_000;
-  if (minutesUntilSlot < policy.modificationCutoffMinutes) throw new ApiError(409, `Bookings can only be modified up to ${policy.modificationCutoffMinutes} minutes before the slot time.`);
+  if (!CUSTOMER_MODIFIABLE_STATUSES.includes(booking.status)) throw new ApiError(409, "This order can no longer be changed.");
   return booking;
 };
 
@@ -375,28 +434,79 @@ export const removePreorderItemForCustomer = async (customerId: string, bookingI
   return getPreorderForCustomer(customerId, bookingId);
 };
 
-/** Admin-initiated cancellation — same rules as the customer path minus the ownership check. */
-export const adminCancelBooking = async (id: string, reasonLabel: string) => {
-  const reason = CANCELLATION_REASON_BY_LABEL[reasonLabel] ?? "OTHER";
+const loadBooking = async (id: string) => {
   const existing = await prisma.restaurantBooking.findUnique({ where: { id } });
   if (!existing) throw new ApiError(404, "Booking not found");
-  if (existing.status === "CANCELLED") throw new ApiError(409, "Booking is already cancelled");
+  return existing;
+};
 
-  const slotDateTime = combineDateAndTime(existing.date, existing.time);
-  const refund = decideRefund({ advancePaid: Number(existing.advancePaid), slotDateTime });
+const ADVANCE_COPY: Record<string, { timestamp: keyof Prisma.RestaurantBookingUpdateManyMutationInput; type: NotificationType; title: string; body: (b: RestaurantBooking) => string }> = {
+  ACKNOWLEDGED: { timestamp: "acknowledgedAt", type: "BOOKING_ACKNOWLEDGED", title: "Order accepted", body: (b) => `${b.restaurantNameSnapshot} has accepted your order ${b.humanBookingId}. See you at ${to12Hour(b.time)}!` },
+  PREPARING: { timestamp: "preparingAt", type: "BOOKING_PREPARING", title: "Your food is being prepared", body: (b) => `${b.restaurantNameSnapshot} has started preparing your order ${b.humanBookingId}.` },
+  READY: { timestamp: "readyAt", type: "BOOKING_READY", title: "Your food is ready", body: (b) => `Your order ${b.humanBookingId} at ${b.restaurantNameSnapshot} is ready.` },
+  COMPLETED: { timestamp: "completedAt", type: "BOOKING_COMPLETED", title: "Order completed", body: (b) => `Thanks for ordering from ${b.restaurantNameSnapshot}! Your order ${b.humanBookingId} is complete.` },
+};
 
-  const updated = await prisma.restaurantBooking.update({
-    where: { id },
-    data: { status: "CANCELLED", cancellationReason: reason, cancelledAt: new Date(), refundEligible: refund.eligible, refundAmount: refund.amount },
+/**
+ * Restaurant moves an order one step forward: upcoming → acknowledged → preparing → ready → completed.
+ * `to` must be exactly the next step, so a stale admin screen can't skip or repeat a step.
+ */
+export const advanceBookingStatus = async (id: string, to: BookingStatus) => {
+  const existing = await loadBooking(id);
+  const copy = ADVANCE_COPY[to];
+  const from = (Object.keys(NEXT_BOOKING_STATUS) as BookingStatus[]).filter((status) => NEXT_BOOKING_STATUS[status] === to);
+  if (!copy || !from.length) throw new ApiError(422, `Can't move an order to ${toClientStatus(to)} directly.`);
+
+  const updated = await applyStatusChange(existing, {
+    from,
+    to,
+    conflictMessage: (current) => `This order is ${toClientStatus(current)}, so it can't be marked ${toClientStatus(to)}.`,
+    data: { [copy.timestamp]: new Date() },
+  });
+
+  if (to === "COMPLETED") await cancelReminder(existing.reminderJobId);
+  await announceStatusChange(updated, { type: copy.type, title: copy.title, body: copy.body(updated) });
+  return { booking: toBookingResponse(updated), restaurantId: existing.restaurantId };
+};
+
+/** Restaurant declines an order it hasn't acknowledged yet. */
+export const rejectBooking = async (id: string, reason?: string) => {
+  const existing = await loadBooking(id);
+  const refund = decideRefund({ advancePaid: Number(existing.advancePaid) });
+  const updated = await applyStatusChange(existing, {
+    from: REJECTABLE_STATUSES,
+    to: "REJECTED",
+    conflictMessage: (current) => `Only new orders can be rejected — this one is already ${toClientStatus(current)}. Cancel it instead.`,
+    data: { rejectionReason: reason?.trim() || null, rejectedAt: new Date(), refundEligible: refund.eligible, refundAmount: refund.amount },
   });
 
   await cancelReminder(existing.reminderJobId);
-  await notifyCustomer({
-    restaurantUserId: existing.restaurantUserId,
+  await announceStatusChange(updated, {
+    type: "BOOKING_REJECTED",
+    title: "Order rejected",
+    body: `${updated.restaurantNameSnapshot} couldn't accept your order ${updated.humanBookingId}.${updated.rejectionReason ? ` Reason: ${updated.rejectionReason}.` : ""} Your payment of ₹${refund.amount} is eligible for a full refund.`,
+  });
+  return { booking: toBookingResponse(updated), refund, restaurantId: existing.restaurantId };
+};
+
+/** Restaurant cancels an order at any point before it is completed. */
+export const adminCancelBooking = async (id: string, reasonLabel: string) => {
+  const reason = CANCELLATION_REASON_BY_LABEL[reasonLabel] ?? "OTHER";
+  const existing = await loadBooking(id);
+  const refund = decideRefund({ advancePaid: Number(existing.advancePaid) });
+
+  const updated = await applyStatusChange(existing, {
+    from: RESTAURANT_CANCELLABLE_STATUSES,
+    to: "CANCELLED",
+    conflictMessage: (current) => (current === "CANCELLED" ? "Booking is already cancelled" : `This order is already ${toClientStatus(current)} and can't be cancelled.`),
+    data: { cancellationReason: reason, cancelledAt: new Date(), cancelledBy: "RESTAURANT", refundEligible: refund.eligible, refundAmount: refund.amount },
+  });
+
+  await cancelReminder(existing.reminderJobId);
+  await announceStatusChange(updated, {
     type: "BOOKING_CANCELLED",
-    bookingId: updated.id,
-    title: "Booking cancelled",
-    body: `Your booking ${updated.humanBookingId} has been cancelled by the restaurant.`,
+    title: "Order cancelled",
+    body: `Your order ${updated.humanBookingId} has been cancelled by the restaurant. Your payment of ₹${refund.amount} is eligible for a full refund.`,
   });
   emitToRestaurant(existing.restaurantId, socketEvents.bookingCancelled, updated);
 

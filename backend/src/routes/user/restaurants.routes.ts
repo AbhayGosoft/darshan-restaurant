@@ -3,8 +3,8 @@ import { z } from "zod";
 import { requireCustomerAuth } from "../../middleware/auth.js";
 import { getRestaurantDetail, listRestaurants } from "../../services/restaurantService.js";
 import { getMenu } from "../../services/menuService.js";
-import { getAvailableSlots } from "../../services/slotService.js";
-// import { getTableAvailability } from "../../services/slotService.js"; // Table booking disabled
+import { getArrivalWindow } from "../../services/arrivalService.js";
+// import { getTableAvailability } from "../../services/tableService.js"; // Table booking disabled
 import { createBooking } from "../../services/bookingService.js";
 import { TABLE_PREFERENCE_LABELS } from "../../constants/bookingOptions.js";
 import { asyncHandler, idParam, sendSuccess, validateBody, validateQuery } from "../../utils/http.js";
@@ -55,19 +55,12 @@ router.get(
   }),
 );
 
-const slotsQuerySchema = z.object({
-  date: z.string().min(1, "date is required"),
-  people: z.coerce.number().int().min(1).default(1),
-  tablePreference: z.enum(Object.values(TABLE_PREFERENCE_LABELS) as [string, ...string[]]).optional(),
-});
-
+// Today's allowed arrival times (orders are same-day only): from now + prep time until closing.
 router.get(
-  "/:id/slots",
+  "/:id/arrival-window",
   asyncHandler(async (req, res) => {
     const id = idParam(req);
-    const query = validateQuery(slotsQuerySchema, req.query);
-    const slots = await getAvailableSlots(id, query.date, query.people, query.tablePreference);
-    sendSuccess(res, slots);
+    sendSuccess(res, await getArrivalWindow(id));
   }),
 );
 
@@ -90,7 +83,9 @@ router.get(
 // );
 
 const bookingSchema = z.object({
-  date: z.string().min(1),
+  /** Optional: orders are same-day only, so this defaults to today and must be today if sent. */
+  date: z.string().min(1).optional(),
+  /** Arrival time, e.g. "1:30 PM". */
   time: z.string().min(1),
   people: z.coerce.number().int().min(1),
   // Table booking disabled — kept optional so older app builds that still send it keep working.
@@ -131,7 +126,7 @@ router.post(
       // tableId: body.tableId, // Table booking disabled
       preorderItems: body.preorderItems,
     });
-    sendSuccess(res, booking, "Booking confirmed", 201);
+    sendSuccess(res, booking, "Order placed", 201);
   }),
 );
 

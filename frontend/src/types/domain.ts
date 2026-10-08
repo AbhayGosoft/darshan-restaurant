@@ -55,6 +55,9 @@ export interface Restaurant {
   longitude: number;
   seatingCapacity?: number;
   maxPartySize: number;
+  /** Opening hours: "HH:mm" on admin responses, "h:mm AM" on public ones. */
+  opensAt?: string;
+  closesAt?: string;
   status: RecordStatus;
   createdAt?: string;
   distanceKm?: number | null;
@@ -79,16 +82,6 @@ export interface MenuCategory {
   items: MenuItem[];
 }
 
-export type SlotMeal = "LUNCH" | "DINNER";
-
-export interface SlotConfiguration {
-  id: string;
-  meal: SlotMeal;
-  time: string; // "12:00 PM"
-  sortOrder: number;
-  isActive: boolean;
-}
-
 export type DiningTableStatus = "ACTIVE" | "INACTIVE" | "MAINTENANCE";
 export interface DiningTable {
   id: string;
@@ -99,7 +92,21 @@ export interface DiningTable {
   status: DiningTableStatus;
 }
 
-export type BookingClientStatus = "upcoming" | "past" | "cancelled";
+/** Order lifecycle: upcoming → acknowledged → preparing → ready → completed; cancelled / rejected end it early. */
+export const BOOKING_STATUSES = ["upcoming", "acknowledged", "preparing", "ready", "completed", "cancelled", "rejected"] as const;
+export type BookingClientStatus = (typeof BOOKING_STATUSES)[number];
+/** Orders still in progress, and the statuses the restaurant can move them forward to. */
+export type ActiveBookingStatus = "upcoming" | "acknowledged" | "preparing" | "ready";
+export type AdvanceBookingStatus = "acknowledged" | "preparing" | "ready" | "completed";
+/** The one forward step the restaurant can take from each status (mirrors the backend). */
+export const NEXT_BOOKING_STATUS: Partial<Record<BookingClientStatus, AdvanceBookingStatus>> = {
+  upcoming: "acknowledged",
+  acknowledged: "preparing",
+  preparing: "ready",
+  ready: "completed",
+};
+/** Statuses the restaurant may still cancel from (every not-yet-finished order). */
+export const RESTAURANT_CANCELLABLE: BookingClientStatus[] = ["upcoming", "acknowledged", "preparing", "ready"];
 export type TablePreference = "Any Table" | "Window Seat" | "Indoor Seat" | "Outdoor Seat";
 
 export interface RestaurantBooking {
@@ -120,7 +127,11 @@ export interface RestaurantBooking {
   mobileNumber: string;
   email?: string;
   status: BookingClientStatus;
+  canCancel?: boolean;
+  canModify?: boolean;
   cancellationReason?: string | null;
+  cancelledBy?: "customer" | "restaurant" | null;
+  rejectionReason?: string | null;
   advancePaid: number;
   table?: Pick<DiningTable, "id" | "name" | "capacity" | "preference" | "section"> | null;
   preorder?: { id: string; subtotal: number; total: number; items: { id: string; menuItemId: string; name: string; unitPrice: number; quantity: number; note?: string | null; lineTotal: number }[] } | null;

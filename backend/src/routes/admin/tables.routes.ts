@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { requireAdminAuth, requireRestaurantAccess } from "../../middleware/auth.js";
-import { getTableAvailability } from "../../services/slotService.js";
+import { getTableAvailability } from "../../services/tableService.js";
 import { TABLE_PREFERENCE_LABELS } from "../../constants/bookingOptions.js";
 import { ApiError, asyncHandler, idParam, sendSuccess, validateBody, validateQuery } from "../../utils/http.js";
 

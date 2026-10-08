@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { CalendarCheck, CalendarX2, LayoutDashboard, IndianRupee, Store, Users } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/store/app-store";
-import type { Restaurant, RestaurantBooking } from "@/types/domain";
+import { RESTAURANT_CANCELLABLE, type Restaurant, type RestaurantBooking } from "@/types/domain";
 import { LoadingGrid, StateView } from "@/components/ui/StateView";
 import { formatNumber } from "@/lib/format";
 
@@ -33,8 +33,8 @@ export function DashboardPage() {
   const allBookings = bookings.data?.bookings ?? [];
   const today = new Date().toISOString().slice(0, 10);
   const todayBookings = allBookings.filter((booking) => booking.date === today);
-  const upcoming = allBookings.filter((booking) => booking.status === "upcoming");
-  const revenue = allBookings.filter((booking) => booking.status !== "cancelled").reduce((total, booking) => total + (booking.preorder?.total ?? booking.advancePaid ?? 0), 0);
+  const upcoming = allBookings.filter((booking) => RESTAURANT_CANCELLABLE.includes(booking.status));
+  const revenue = allBookings.filter((booking) => booking.status !== "cancelled" && booking.status !== "rejected").reduce((total, booking) => total + (booking.preorder?.total ?? booking.advancePaid ?? 0), 0);
   const heading = restaurant?.name ?? selectedAdmin?.name ?? (isSuperAdmin ? t("nav.allRestaurants") : t("nav.myRestaurants"));
   const subheading = t(restaurant ? "dashboard.scope.restaurant" : selectedAdmin ? "dashboard.scope.admin" : isSuperAdmin ? "dashboard.scope.all" : "dashboard.scope.own");
   return <main className="page">

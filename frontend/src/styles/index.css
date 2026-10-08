@@ -78,6 +78,11 @@ h1, h2, h3, .brand { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans 
 .date-input input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .date-input__icon { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); color: #2563eb; pointer-events: none; }
 .date-input:focus-within .date-input__icon { color: #1d4ed8; }
+/* Native date text is hidden (it follows the browser locale); .date-input__display shows dd/mm/yy instead. */
+.date-input input { color: transparent; }
+.date-input input::-webkit-datetime-edit { color: transparent; }
+.date-input__display { position: absolute; top: 50%; left: 14px; transform: translateY(-50%); color: #53615d; font-weight: 600; pointer-events: none; white-space: nowrap; }
+.date-input__display--empty { color: #a3aeb0; font-weight: 500; }
 .date-range-filter .date-input { min-width: 150px; }
 .date-input.filter-select { display: flex; align-items: center; padding: 0 14px; }
 .date-input.filter-select input { min-height: 0; padding: 0 34px 0 0 !important; border: 0; outline: 0; background: transparent; }
@@ -825,9 +830,13 @@ h1, h2, h3, .brand { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans 
 
 .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 800; letter-spacing: .3px; color: var(--brand); background: var(--brand-pale); text-transform: capitalize; }
 .badge--muted { color: var(--muted); background: #f0f0ec; }
-.badge--upcoming { color: #187764; background: #e3f7ee; }
-.badge--past { color: var(--muted); background: #f0f0ec; }
+.badge--upcoming { color: #1d4f91; background: #e8f0fd; }
+.badge--acknowledged { color: #6b3fa0; background: #f2ebfb; }
+.badge--preparing { color: #a35a00; background: #fff3e0; }
+.badge--ready { color: #187764; background: #e3f7ee; }
+.badge--completed { color: var(--muted); background: #f0f0ec; }
 .badge--cancelled { color: #9f3737; background: #fff0f0; }
+.badge--rejected { color: #9f3737; background: #fff0f0; }
 .badge--active { color: #187764; background: #e3f7ee; }
 .badge--inactive { color: var(--muted); background: #f0f0ec; }
 
@@ -840,6 +849,23 @@ h1, h2, h3, .brand { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans 
 .data-table__row:hover { background: #fafcfb; }
 
 .pagination-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 20px; font-size: 13px; color: var(--muted); }
+.pagination-row--split { justify-content: space-between; flex-wrap: wrap; }
+.pagination-row__controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pagination-row .pagination-row__size { min-width: 0; min-height: 38px; }
+
+/* --- Bookings table --- */
+.toolbar { flex-wrap: wrap; }
+.table-scroll--loading { opacity: .6; transition: opacity .15s; }
+.data-table__num { text-align: right; }
+.data-table .sort-header { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.data-table .sort-header:hover { color: var(--brand); }
+.bookings-table td { white-space: nowrap; }
+.bookings-table__id { font-weight: 700; color: var(--ink); }
+.bookings-table__when strong { display: block; color: var(--ink); }
+.bookings-table__when small { display: block; margin-top: 2px; }
+.bookings-table__day { color: var(--brand); font-weight: 700; }
+.data-table__row--today { background: #fffaf5; }
+.data-table__row--today:hover { background: #fff3e8; }
 
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin: 20px 0; }
 .stat-card { display: flex; align-items: center; gap: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 17px; background: white; box-shadow: var(--shadow); }
@@ -887,6 +913,10 @@ h1, h2, h3, .brand { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans 
 .booking-detail-row svg { color: var(--muted); flex-shrink: 0; }
 .booking-cancel-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding-top: 16px; border-top: 1px solid var(--line); }
 .booking-cancel-row select { min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 11px; background: white; }
+.booking-cancel-row input { flex: 1; min-width: 0; min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 11px; background: white; }
+.booking-action-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 6px; padding-top: 16px; border-top: 1px solid var(--line); }
+.bookings-table .bookings-table__action { min-height: 34px; padding: 0 12px; font-size: 12px; white-space: nowrap; }
+.notification-item__status { font-weight: 700; color: var(--ink); }
 
 .workspace-context__thumb { width: 24px; height: 24px; border-radius: 7px; object-fit: cover; }
 
@@ -964,6 +994,11 @@ html:lang(hi) .eyebrow, html:lang(gu) .eyebrow { letter-spacing: 0; text-transfo
 .notification-item__icon { flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; color: var(--brand); background: var(--brand-pale); }
 .notification-item__cancelled { color: #9f3737; font-weight: 700; }
 .notification-bell__panel .notification-panel__list { max-height: min(420px, 70svh); }
+/* Items must keep their natural height inside the scrollable flex list, otherwise they get squashed and overlap. */
+.notification-bell__panel .notification-item { flex-shrink: 0; height: auto; }
+/* The bell lives inside .topbar, whose small/strong styles (uppercase, letter-spacing, Manrope) must not leak in. */
+.notification-bell__panel .notification-item__body strong { margin-top: 0; font-family: inherit; }
+.notification-bell__panel .notification-item__body small { text-transform: none; letter-spacing: normal; overflow-wrap: anywhere; }
 @media (max-width: 590px) {
   /* Phones: drop the panel below the topbar at full width instead of anchoring it to the bell. */
   .notification-bell__panel { position: fixed; top: calc(env(safe-area-inset-top) + 72px); left: 16px; right: 16px; width: auto; max-width: none; transform: none; }

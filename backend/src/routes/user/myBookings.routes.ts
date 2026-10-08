@@ -7,7 +7,8 @@ import { asyncHandler, sendSuccess, validateQuery } from "../../utils/http.js";
 const router = Router();
 router.use(requireCustomerAuth);
 
-const querySchema = z.object({ filter: z.enum(["upcoming", "past"]).optional() });
+// "active" = still in progress, "past" = completed/cancelled/rejected; "upcoming" is kept as an alias of "active".
+const querySchema = z.object({ filter: z.enum(["active", "upcoming", "past"]).optional() });
 
 // OpenAPI docs: src/docs/user/myBookings.docs.ts
 router.get(

@@ -4,6 +4,7 @@ import { ApiError } from "../utils/http.js";
 import { haversineDistanceKm } from "../utils/geo.js";
 import { resolveAssetUrl } from "../utils/images.js";
 import { pagination } from "../utils/query.js";
+import { to12Hour } from "../utils/slotTime.js";
 
 const restaurantInclude = {
   categories: { include: { category: true } },
@@ -23,6 +24,8 @@ const toPublicRestaurant = (restaurant: RestaurantWithCategories, userLocation?:
   ratingCount: restaurant.ratingCount,
   prepTimeMin: restaurant.prepTimeMin,
   prepTimeMax: restaurant.prepTimeMax,
+  opensAt: to12Hour(restaurant.opensAt),
+  closesAt: to12Hour(restaurant.closesAt),
   priceForTwo: restaurant.priceForTwo,
   offerText: restaurant.offerText,
   offerSubText: restaurant.offerSubText,
@@ -95,7 +98,7 @@ export const getRestaurantDetail = async (id: string, userLocation?: { latitude:
   return toPublicRestaurant(restaurant, userLocation);
 };
 
-/** Internal helper for services that need the raw record (booking, admin, slots). */
+/** Internal helper for services that need the raw record (booking, admin, arrival window). */
 export const getActiveRestaurantOrThrow = async (id: string) => {
   const restaurant = await prisma.restaurant.findUnique({ where: { id } });
   if (!restaurant || restaurant.status !== "ACTIVE") throw new ApiError(404, "Restaurant not found");

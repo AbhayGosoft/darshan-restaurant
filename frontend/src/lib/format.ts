@@ -10,6 +10,12 @@ export const formatNumber = (value: number) => new Intl.NumberFormat(currentLoca
 export const shortDate = (value: string) =>
   new Intl.DateTimeFormat(currentLocale(), { day: "numeric", month: "short" }).format(new Date(value));
 
+/** "YYYY-MM-DD" → "dd/mm/yy". Parsed as text so the browser's timezone can't shift the day. */
+export const formatDateDMY = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1].slice(2)}` : value;
+};
+
 export const initials = (name = "User") =>
   name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 

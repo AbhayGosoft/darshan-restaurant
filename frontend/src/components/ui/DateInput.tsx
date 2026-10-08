@@ -1,5 +1,6 @@
 import { forwardRef, useRef, type InputHTMLAttributes } from "react";
 import { CalendarDays } from "lucide-react";
+import { formatDateDMY } from "@/lib/format";
 
 type DateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
 
@@ -26,8 +27,12 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(({ classNa
     }
   };
 
+  // The native control's text follows the browser locale, so it's hidden and the value is shown as dd/mm/yy instead.
+  const shown = typeof props.value === "string" && props.value ? formatDateDMY(props.value) : "";
+
   return (
     <span className={`date-input ${className}`.trim()} onClick={openPicker}>
+      <span className={`date-input__display ${shown ? "" : "date-input__display--empty"}`.trim()} aria-hidden="true">{shown || "dd/mm/yy"}</span>
       <input
         {...props}
         ref={setRefs}

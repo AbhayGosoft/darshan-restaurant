@@ -29,7 +29,7 @@
  * /api/restaurant-bookings/{id}:
  *   patch:
  *     tags: ["User: Bookings"]
- *     summary: Modify date/time/party size of a booking
+ *     summary: Change arrival time / party size (only while the order is still "upcoming")
  *     security:
  *       - ClientKey: []
  *       - CustomerBearer: []
@@ -44,10 +44,10 @@
  *         application/json:
  *           schema:
  *             type: object
- *             description: At least one of date, time, people is required
+ *             description: At least one of time, people is required
  *             properties:
- *               date: { type: string, example: "2026-09-20" }
- *               time: { type: string, example: "07:30 PM" }
+ *               date: { type: string, example: "2026-10-03", description: "Optional — must be today if sent" }
+ *               time: { type: string, example: "2:00 PM", description: "New arrival time" }
  *               people: { type: integer, minimum: 1 }
  *     responses:
  *       200:
@@ -68,7 +68,7 @@
  * /api/restaurant-bookings/{id}/cancel:
  *   post:
  *     tags: ["User: Bookings"]
- *     summary: Cancel a booking
+ *     summary: Cancel an order (only while "upcoming" or "acknowledged" — not once preparation started)
  *     security:
  *       - ClientKey: []
  *       - CustomerBearer: []

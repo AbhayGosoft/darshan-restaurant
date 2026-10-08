@@ -1,4 +1,4 @@
-/** DB stores slot times as 24h "HH:mm"; the API surface uses "h:mm AM/PM" throughout. */
+/** DB stores times (arrival, opening hours) as 24h "HH:mm"; the customer API uses "h:mm AM/PM" throughout. */
 export const to12Hour = (time24: string): string => {
   const [hourStr, minuteStr] = time24.split(":");
   const hour = Number(hourStr);
@@ -19,4 +19,17 @@ export const to24Hour = (time12: string): string => {
   return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 };
 
-export const isValidTime12 = (value: string) => /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.test(value.trim());
+export const isValidTime12 = (value: string) => {
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(value.trim());
+  return Boolean(match) && Number(match![1]) >= 1 && Number(match![1]) <= 12 && Number(match![2]) <= 59;
+};
+
+/** 24h "HH:mm" with a real hour/minute, e.g. "09:00" or "23:30". */
+export const isValidTime24 = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+
+/** "HH:mm" ↔ minutes since midnight. */
+export const toMinutes = (time24: string) => {
+  const [hour, minute] = time24.split(":").map(Number);
+  return hour! * 60 + minute!;
+};
+export const fromMinutes = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;

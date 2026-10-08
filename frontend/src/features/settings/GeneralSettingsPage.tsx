@@ -31,13 +31,15 @@ type GeneralForm = {
   phone: string;
   seatingCapacity: number;
   maxPartySize: number;
+  opensAt: string;
+  closesAt: string;
 };
 
 const emptyForm: GeneralForm = {
   name: "", cuisineLabel: "", isPureVeg: false, prepTimeMin: 20, prepTimeMax: 35,
   priceForTwo: 0, offerText: "", offerSubText: "", about: "", addressLine: "",
   city: "", state: "", country: "India", pincode: "", latitude: 0, longitude: 0,
-  phone: "", seatingCapacity: 40, maxPartySize: 12,
+  phone: "", seatingCapacity: 40, maxPartySize: 12, opensAt: "09:00", closesAt: "23:00",
 };
 
 export function GeneralSettingsPage() {
@@ -66,6 +68,7 @@ export function GeneralSettingsPage() {
       pincode: r.pincode ?? r.address?.pincode ?? "",
       latitude: r.latitude, longitude: r.longitude, phone: r.phone,
       seatingCapacity: r.seatingCapacity ?? 40, maxPartySize: r.maxPartySize,
+      opensAt: r.opensAt ?? "09:00", closesAt: r.closesAt ?? "23:00",
     });
     setBanner(r.banner ? [{ imageUrl: r.banner, sortOrder: 0 }] : []);
     setGallery(r.gallery.map((imageUrl, sortOrder) => ({ imageUrl, sortOrder })));
@@ -142,6 +145,12 @@ export function GeneralSettingsPage() {
         <label><span className="label-title">{t("common.phone")}<Req /></span><PhoneField control={control} name="phone" error={errors.phone} required /></label>
         <label><span className="label-title">{t("restaurants.seatingCapacity")}<Req /></span><input type="number" min={1} {...register("seatingCapacity", { required: true, valueAsNumber: true })} /></label>
         <label><span className="label-title">{t("restaurants.maxPartySize")}<Req /></span><input type="number" min={1} {...register("maxPartySize", { required: true, valueAsNumber: true })} /></label>
+        <label><span className="label-title">{t("general.opensAt")}<Req /></span><input type="time" {...register("opensAt", { required: t("general.opensAtRequired") })} /><FieldError error={errors.opensAt} /></label>
+        <label><span className="label-title">{t("general.closesAt")}<Req /></span>
+          <input type="time" {...register("closesAt", { required: t("general.closesAtRequired"), validate: (value, form) => value > form.opensAt || t("general.closesAfterOpens") })} />
+          <FieldError error={errors.closesAt} />
+          <small className="muted">{t("general.openingHoursHint")}</small>
+        </label>
       </div>
       {mutation.error && <div className="form-error">{mutation.error.message}</div>}
       <footer className="settings-form__footer">

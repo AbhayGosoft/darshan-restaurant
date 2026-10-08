@@ -9,6 +9,7 @@ import { queryClient } from "@/lib/query-client";
 import { useBackCloseable } from "@/lib/modal-stack";
 import { formatNumber, timeAgo } from "@/lib/format";
 import { useAppStore } from "@/store/app-store";
+import type { BookingClientStatus } from "@/types/domain";
 
 export type BookingNotification = {
   bookingId: string;
@@ -21,7 +22,7 @@ export type BookingNotification = {
   date: string;
   time: string;
   amount: number;
-  status: "upcoming" | "cancelled";
+  status: BookingClientStatus;
   createdAt: string;
   unread: boolean;
 };
@@ -129,7 +130,7 @@ export function NotificationBell() {
                     <strong>{t("notifications.newBooking", { restaurant: item.restaurantName })}</strong>
                     <small>
                       {item.fullName} · {t("common.people", { count: item.people })} · {t("common.dateAtTime", { date: item.date, time: item.time })}
-                      {item.status === "cancelled" && <> · <span className="notification-item__cancelled">{t("bookings.status.cancelled")}</span></>}
+                      {item.status !== "upcoming" && <> · <span className={clsx("notification-item__status", (item.status === "cancelled" || item.status === "rejected") && "notification-item__cancelled")}>{t(`bookings.status.${item.status}`)}</span></>}
                     </small>
                     <span className="notification-item__time">{item.humanBookingId} · ₹{formatNumber(item.amount)} · {timeAgo(item.createdAt)}</span>
                   </span>

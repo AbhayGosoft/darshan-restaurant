@@ -5,6 +5,7 @@ import { requireAdminAuth } from "../../middleware/auth.js";
 import { resolveAssetUrl } from "../../utils/images.js";
 import { formatDateOnly } from "../../utils/dates.js";
 import { to12Hour } from "../../utils/slotTime.js";
+import { toClientStatus } from "../../constants/bookingStatus.js";
 import { asyncHandler, sendSuccess, validateQuery } from "../../utils/http.js";
 
 // New-booking feed for the admin panel's header bell. Scoped like the bookings list: a plain
@@ -60,7 +61,7 @@ router.get(
         date: formatDateOnly(booking.date),
         time: to12Hour(booking.time),
         amount: Number(booking.preorder?.total ?? booking.advancePaid),
-        status: booking.status === "CANCELLED" ? "cancelled" : "upcoming",
+        status: toClientStatus(booking.status),
         createdAt: booking.createdAt,
         unread: booking.createdAt > seenAt,
       })),
