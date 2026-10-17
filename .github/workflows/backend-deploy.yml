@@ -137,7 +137,7 @@ jobs:
 
             APP_NAME="restaurant-backend"
 
-            REPO_PATH="/var/www/restaurant-admin"
+            REPO_PATH="/var/www/darshan/darshan-restaurant"
 
             BACKEND_PATH="$REPO_PATH/backend"
 
