@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import type { AdminRole } from "../../generated/prisma/enums.js";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
+import { DEFAULT_LANGUAGE, normalizeLanguage } from "../i18n/languages.js";
 import { ApiError } from "../utils/http.js";
 
 type AdminJwtPayload = { sub: string; email: string; role: AdminRole; type: "admin" };
@@ -85,11 +86,18 @@ export const requireCustomerAuth = async (req: Request, _res: Response, next: Ne
 
     const customer = await prisma.restaurantUser.findUnique({
       where: { id: decoded.sub },
-      select: { id: true, phone: true },
+      select: { id: true, phone: true, language: true },
     });
     if (!customer) throw new ApiError(401, "Account no longer exists");
 
-    req.customer = { id: customer.id, phone: customer.phone };
+    // Remember the language the app is using so push notifications (sent outside any request) match it.
+    let language = normalizeLanguage(customer.language) ?? DEFAULT_LANGUAGE;
+    if (req.langExplicit && req.lang && req.lang !== language) {
+      await prisma.restaurantUser.update({ where: { id: customer.id }, data: { language: req.lang } });
+      language = req.lang;
+    }
+
+    req.customer = { id: customer.id, phone: customer.phone, language };
     next();
   } catch (error) {
     next(error instanceof ApiError ? error : new ApiError(401, "Invalid or expired token"));

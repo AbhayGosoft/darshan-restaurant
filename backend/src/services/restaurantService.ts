@@ -5,6 +5,8 @@ import { haversineDistanceKm } from "../utils/geo.js";
 import { resolveAssetUrl } from "../utils/images.js";
 import { pagination } from "../utils/query.js";
 import { to12Hour } from "../utils/slotTime.js";
+import { DEFAULT_LANGUAGE, type Language } from "../i18n/languages.js";
+import { translator } from "../i18n/translations.js";
 
 const restaurantInclude = {
   categories: { include: { category: true } },
@@ -12,40 +14,43 @@ const restaurantInclude = {
 
 type RestaurantWithCategories = Prisma.RestaurantGetPayload<{ include: typeof restaurantInclude }>;
 
-const toPublicRestaurant = (restaurant: RestaurantWithCategories, userLocation?: { latitude: number; longitude: number }) => ({
-  id: restaurant.id,
-  name: restaurant.name,
-  banner: resolveAssetUrl(restaurant.banner ?? undefined) ?? null,
-  gallery: ((restaurant.gallery as string[] | null) ?? []).map((url) => resolveAssetUrl(url)),
-  categories: restaurant.categories.map((link) => link.category.key),
-  cuisineLabel: restaurant.cuisineLabel,
-  isPureVeg: restaurant.isPureVeg,
-  rating: Number(restaurant.rating),
-  ratingCount: restaurant.ratingCount,
-  prepTimeMin: restaurant.prepTimeMin,
-  prepTimeMax: restaurant.prepTimeMax,
-  opensAt: to12Hour(restaurant.opensAt),
-  closesAt: to12Hour(restaurant.closesAt),
-  priceForTwo: restaurant.priceForTwo,
-  offerText: restaurant.offerText,
-  offerSubText: restaurant.offerSubText,
-  about: restaurant.about,
-  address: {
-    line: restaurant.addressLine,
-    city: restaurant.city,
-    state: restaurant.state,
-    country: restaurant.country,
-    pincode: restaurant.pincode,
-  },
-  phone: restaurant.phone,
-  latitude: Number(restaurant.latitude),
-  longitude: Number(restaurant.longitude),
-  maxPartySize: restaurant.maxPartySize,
-  distanceKm:
-    userLocation && Number.isFinite(userLocation.latitude) && Number.isFinite(userLocation.longitude)
-      ? haversineDistanceKm(userLocation, { latitude: Number(restaurant.latitude), longitude: Number(restaurant.longitude) })
-      : null,
-});
+const toPublicRestaurant = (restaurant: RestaurantWithCategories, lang: Language, userLocation?: { latitude: number; longitude: number }) => {
+  const t = translator(restaurant.translations, lang);
+  return {
+    id: restaurant.id,
+    name: t("name", restaurant.name),
+    banner: resolveAssetUrl(restaurant.banner ?? undefined) ?? null,
+    gallery: ((restaurant.gallery as string[] | null) ?? []).map((url) => resolveAssetUrl(url)),
+    categories: restaurant.categories.map((link) => link.category.key),
+    cuisineLabel: t("cuisineLabel", restaurant.cuisineLabel),
+    isPureVeg: restaurant.isPureVeg,
+    rating: Number(restaurant.rating),
+    ratingCount: restaurant.ratingCount,
+    prepTimeMin: restaurant.prepTimeMin,
+    prepTimeMax: restaurant.prepTimeMax,
+    opensAt: to12Hour(restaurant.opensAt),
+    closesAt: to12Hour(restaurant.closesAt),
+    priceForTwo: restaurant.priceForTwo,
+    offerText: t("offerText", restaurant.offerText),
+    offerSubText: t("offerSubText", restaurant.offerSubText),
+    about: t("about", restaurant.about),
+    address: {
+      line: t("addressLine", restaurant.addressLine),
+      city: t("city", restaurant.city),
+      state: t("state", restaurant.state),
+      country: restaurant.country,
+      pincode: restaurant.pincode,
+    },
+    phone: restaurant.phone,
+    latitude: Number(restaurant.latitude),
+    longitude: Number(restaurant.longitude),
+    maxPartySize: restaurant.maxPartySize,
+    distanceKm:
+      userLocation && Number.isFinite(userLocation.latitude) && Number.isFinite(userLocation.longitude)
+        ? haversineDistanceKm(userLocation, { latitude: Number(restaurant.latitude), longitude: Number(restaurant.longitude) })
+        : null,
+  };
+};
 
 export type ListRestaurantsInput = {
   city?: string;
@@ -55,6 +60,7 @@ export type ListRestaurantsInput = {
   longitude?: number;
   page: number;
   limit: number;
+  lang?: Language;
 };
 
 export const listRestaurants = async (input: ListRestaurantsInput) => {
@@ -67,6 +73,13 @@ export const listRestaurants = async (input: ListRestaurantsInput) => {
           OR: [
             { name: { contains: input.q } },
             { cuisineLabel: { contains: input.q } },
+            // Customers searching in their own language should find translated names too.
+            ...(input.lang && input.lang !== DEFAULT_LANGUAGE
+              ? [
+                  { translations: { path: `$.${input.lang}.name`, string_contains: input.q } },
+                  { translations: { path: `$.${input.lang}.cuisineLabel`, string_contains: input.q } },
+                ]
+              : []),
           ],
         }
       : {}),
@@ -87,15 +100,15 @@ export const listRestaurants = async (input: ListRestaurantsInput) => {
     input.latitude !== undefined && input.longitude !== undefined ? { latitude: input.latitude, longitude: input.longitude } : undefined;
 
   return {
-    restaurants: restaurants.map((restaurant) => toPublicRestaurant(restaurant, userLocation)),
+    restaurants: restaurants.map((restaurant) => toPublicRestaurant(restaurant, input.lang ?? DEFAULT_LANGUAGE, userLocation)),
     pagination: pagination(input.page, input.limit, total),
   };
 };
 
-export const getRestaurantDetail = async (id: string, userLocation?: { latitude: number; longitude: number }) => {
+export const getRestaurantDetail = async (id: string, userLocation?: { latitude: number; longitude: number }, lang: Language = DEFAULT_LANGUAGE) => {
   const restaurant = await prisma.restaurant.findUnique({ where: { id }, include: restaurantInclude });
   if (!restaurant || restaurant.status !== "ACTIVE") throw new ApiError(404, "Restaurant not found");
-  return toPublicRestaurant(restaurant, userLocation);
+  return toPublicRestaurant(restaurant, lang, userLocation);
 };
 
 /** Internal helper for services that need the raw record (booking, admin, arrival window). */
@@ -103,4 +116,10 @@ export const getActiveRestaurantOrThrow = async (id: string) => {
   const restaurant = await prisma.restaurant.findUnique({ where: { id } });
   if (!restaurant || restaurant.status !== "ACTIVE") throw new ApiError(404, "Restaurant not found");
   return restaurant;
+};
+
+/** Active restaurant categories ("Pure Veg", ...) with labels in the requested language. */
+export const listRestaurantCategories = async (lang: Language = DEFAULT_LANGUAGE) => {
+  const categories = await prisma.restaurantCategory.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } });
+  return categories.map((category) => ({ key: category.key, label: translator(category.translations, lang)("label", category.label) }));
 };

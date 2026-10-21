@@ -4,8 +4,11 @@ import { prisma } from "../../lib/prisma.js";
 import { requireAdminAuth, requireSuperAdmin } from "../../middleware/auth.js";
 import { ApiError, asyncHandler, idParam, sendSuccess, validateBody } from "../../utils/http.js";
 import { slugify } from "../../utils/query.js";
+import { RESTAURANT_CATEGORY_TRANSLATABLE_FIELDS, translationsForAdmin, translationsInputSchema } from "../../i18n/translations.js";
 
 const router = Router();
+
+const toAdminCategory = <T extends { translations: unknown }>(category: T) => ({ ...category, translations: translationsForAdmin(category.translations) });
 
 // OpenAPI docs: src/docs/admin/categories.docs.ts
 router.get(
@@ -13,7 +16,7 @@ router.get(
   requireAdminAuth,
   asyncHandler(async (_req, res) => {
     const categories = await prisma.restaurantCategory.findMany({ orderBy: { sortOrder: "asc" } });
-    sendSuccess(res, categories);
+    sendSuccess(res, categories.map(toAdminCategory));
   }),
 );
 
@@ -23,6 +26,8 @@ const upsertSchema = z.object({
   label: z.string().trim().min(1),
   sortOrder: z.coerce.number().int().default(0),
   isActive: z.boolean().default(true),
+  /** { "hi": { "label": "..." } } — replaces the stored set on update. */
+  translations: translationsInputSchema(RESTAURANT_CATEGORY_TRANSLATABLE_FIELDS).optional(),
 });
 
 router.post(
@@ -30,9 +35,9 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = validateBody(upsertSchema, req.body);
     const category = await prisma.restaurantCategory.create({
-      data: { key: slugify(body.label).replace(/-/g, "_"), label: body.label, sortOrder: body.sortOrder, isActive: body.isActive },
+      data: { key: slugify(body.label).replace(/-/g, "_"), label: body.label, sortOrder: body.sortOrder, isActive: body.isActive, translations: body.translations },
     });
-    sendSuccess(res, category, "Category created", 201);
+    sendSuccess(res, toAdminCategory(category), "Category created", 201);
   }),
 );
 
@@ -42,7 +47,7 @@ router.patch(
     const id = idParam(req);
     const body = validateBody(upsertSchema.partial(), req.body);
     const category = await prisma.restaurantCategory.update({ where: { id }, data: body });
-    sendSuccess(res, category, "Category updated");
+    sendSuccess(res, toAdminCategory(category), "Category updated");
   }),
 );
 

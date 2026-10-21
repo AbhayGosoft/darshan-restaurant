@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { requireCustomerAuth } from "../../middleware/auth.js";
-import { getRestaurantDetail, listRestaurants } from "../../services/restaurantService.js";
+import { getRestaurantDetail, listRestaurantCategories, listRestaurants } from "../../services/restaurantService.js";
 import { getMenu } from "../../services/menuService.js";
 import { getArrivalWindow } from "../../services/arrivalService.js";
 // import { getTableAvailability } from "../../services/tableService.js"; // Table booking disabled
@@ -28,8 +28,16 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     const query = validateQuery(listQuerySchema, req.query);
-    const result = await listRestaurants(query);
+    const result = await listRestaurants({ ...query, lang: req.lang });
     sendSuccess(res, { restaurants: result.restaurants, pagination: result.pagination });
+  }),
+);
+
+// Category filter chips ("Pure Veg", ...). Declared before "/:id" so "categories" isn't read as an id.
+router.get(
+  "/categories",
+  asyncHandler(async (req, res) => {
+    sendSuccess(res, await listRestaurantCategories(req.lang));
   }),
 );
 
@@ -41,7 +49,7 @@ router.get(
     const id = idParam(req);
     const query = validateQuery(detailQuerySchema, req.query);
     const userLocation = query.latitude !== undefined && query.longitude !== undefined ? { latitude: query.latitude, longitude: query.longitude } : undefined;
-    const restaurant = await getRestaurantDetail(id, userLocation);
+    const restaurant = await getRestaurantDetail(id, userLocation, req.lang);
     sendSuccess(res, restaurant);
   }),
 );
@@ -50,7 +58,7 @@ router.get(
   "/:id/menu",
   asyncHandler(async (req, res) => {
     const id = idParam(req);
-    const menu = await getMenu(id);
+    const menu = await getMenu(id, req.lang);
     sendSuccess(res, menu);
   }),
 );
@@ -125,7 +133,7 @@ router.post(
       razorpayPaymentId: body.payment.razorpay_payment_id,
       // tableId: body.tableId, // Table booking disabled
       preorderItems: body.preorderItems,
-    });
+    }, req.lang);
     sendSuccess(res, booking, "Order placed", 201);
   }),
 );

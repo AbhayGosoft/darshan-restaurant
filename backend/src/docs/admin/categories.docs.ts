@@ -34,6 +34,7 @@
  *             type: object
  *             required: [label]
  *             properties:
+ *               translations: { $ref: "#/components/schemas/Translations" }
  *               label: { type: string }
  *               sortOrder: { type: integer, default: 0 }
  *               isActive: { type: boolean, default: true }
@@ -71,6 +72,7 @@
  *           schema:
  *             type: object
  *             properties:
+ *               translations: { $ref: "#/components/schemas/Translations" }
  *               label: { type: string }
  *               sortOrder: { type: integer }
  *               isActive: { type: boolean }

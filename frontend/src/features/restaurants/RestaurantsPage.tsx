@@ -11,6 +11,8 @@ import type { HardDeleteResult, Restaurant } from "@/types/domain";
 import { Button } from "@/components/ui/Button";
 import { LoadingGrid, StateView } from "@/components/ui/StateView";
 import { ConfirmDialog, DialogFooter, FieldError, Notice, PhoneField, ResourceDialog, ResourceToolbar, Req, StatusTabs, cleanBody, hardDeleteMessage, type ListStatus } from "@/components/resource/dialog-kit";
+import { TranslationsEditor } from "@/components/resource/TranslationsEditor";
+import type { Translations } from "@/i18n/content-languages";
 
 type CreateForm = {
   name: string; cuisineLabel: string; addressLine: string; city: string; phone: string;
@@ -51,17 +53,19 @@ export function RestaurantsPage({ embedded = false }: { embedded?: boolean }) {
       ),
   });
 
-  const { register, control, handleSubmit, reset, formState: { errors } } = useForm<CreateForm>({ defaultValues: emptyForm });
+  const { register, control, handleSubmit, reset, watch, formState: { errors } } = useForm<CreateForm>({ defaultValues: emptyForm });
+  const [translations, setTranslations] = useState<Translations>({});
 
   const create = useMutation({
     mutationFn: (data: CreateForm) =>
       api<Restaurant>("/admin/restaurants", {
         method: "POST",
-        body: cleanBody(selectedAdmin ? { ...data, adminId: selectedAdmin.id } : data),
+        body: cleanBody(selectedAdmin ? { ...data, translations, adminId: selectedAdmin.id } : { ...data, translations }),
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin-restaurants"] });
       reset(emptyForm);
+      setTranslations({});
       setDialogOpen(false);
     },
   });
@@ -184,6 +188,16 @@ export function RestaurantsPage({ embedded = false }: { embedded?: boolean }) {
               <label>{t("restaurants.priceForTwo")}<input type="number" {...register("priceForTwo", { valueAsNumber: true })} /></label>
               <label>{t("restaurants.seatingCapacity")}<input type="number" {...register("seatingCapacity", { valueAsNumber: true })} /></label>
               <label>{t("restaurants.maxPartySize")}<input type="number" {...register("maxPartySize", { valueAsNumber: true })} /></label>
+              <TranslationsEditor
+                value={translations}
+                onChange={setTranslations}
+                fields={[
+                  { key: "name", label: t("restaurants.nameLabel"), source: watch("name") },
+                  { key: "cuisineLabel", label: t("restaurants.cuisineLabel"), source: watch("cuisineLabel") },
+                  { key: "addressLine", label: t("common.address"), source: watch("addressLine"), multiline: true },
+                  { key: "city", label: t("common.city"), source: watch("city") },
+                ]}
+              />
             </div>
             {create.error && <div className="form-error">{create.error.message}</div>}
             <DialogFooter onClose={() => setDialogOpen(false)} loading={create.isPending} label={t("restaurants.add")} />

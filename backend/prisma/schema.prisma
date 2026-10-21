@@ -81,6 +81,8 @@ model RestaurantUser {
   email         String?
   playerId      String?  @map("player_id")
   centralUserId Int?     @unique @map("central_user_id")
+  /// Language the customer last used in the app; push notifications are sent in it.
+  language      String   @default("en") @db.VarChar(8)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -108,16 +110,16 @@ model RefreshSession {
 }
 
 model AdminUser {
-  id           String       @id @default(uuid())
-  name         String
-  email        String       @unique
-  passwordHash String       @map("password_hash")
-  role         AdminRole    @default(ADMIN)
-  status       RecordStatus @default(ACTIVE)
+  id                  String       @id @default(uuid())
+  name                String
+  email               String       @unique
+  passwordHash        String       @map("password_hash")
+  role                AdminRole    @default(ADMIN)
+  status              RecordStatus @default(ACTIVE)
   /// Last time this admin opened the new-bookings notification panel; bookings created after it count as unread.
-  notificationsSeenAt DateTime? @map("notifications_seen_at")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+  notificationsSeenAt DateTime?    @map("notifications_seen_at")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
 
   restaurants AdminRestaurant[]
 
@@ -139,12 +141,14 @@ model AdminRestaurant {
 }
 
 model RestaurantCategory {
-  id        String   @id @default(uuid())
-  key       String   @unique
-  label     String
-  sortOrder Int      @default(0) @map("sort_order")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid())
+  key          String   @unique
+  label        String
+  sortOrder    Int      @default(0) @map("sort_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  /// Non-English copies of the text fields, e.g. { "hi": { "name": "..." } }. English lives in the regular columns.
+  translations Json?
+  createdAt    DateTime @default(now()) @map("created_at")
 
   restaurants RestaurantCategoryLink[]
 
@@ -179,6 +183,8 @@ model Restaurant {
   offerText       String?      @map("offer_text")
   offerSubText    String?      @map("offer_sub_text")
   about           String?      @db.Text
+  /// Non-English copies of the text fields, e.g. { "hi": { "name": "..." } }. English lives in the regular columns.
+  translations    Json?
   addressLine     String       @map("address_line")
   city            String
   state           String?
@@ -212,6 +218,8 @@ model MenuCategory {
   name         String
   sortOrder    Int      @default(0) @map("sort_order")
   isActive     Boolean  @default(true) @map("is_active")
+  /// Non-English copies of the text fields, e.g. { "hi": { "name": "..." } }. English lives in the regular columns.
+  translations Json?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -227,6 +235,8 @@ model MenuItem {
   menuCategoryId String   @map("menu_category_id")
   name           String
   description    String?  @db.Text
+  /// Non-English copies of the text fields, e.g. { "hi": { "name": "..." } }. English lives in the regular columns.
+  translations   Json?
   price          Decimal  @db.Decimal(10, 2)
   image          String?  @db.VarChar(1024)
   isVeg          Boolean  @default(true) @map("is_veg")
@@ -269,6 +279,8 @@ model RestaurantBooking {
   restaurantImageSnapshot String?             @map("restaurant_image_snapshot") @db.VarChar(1024)
   ratingSnapshot          Decimal             @map("rating_snapshot") @db.Decimal(2, 1)
   cuisineLabelSnapshot    String              @map("cuisine_label_snapshot")
+  /// Restaurant name/cuisine translations as they were when the order was placed.
+  translationsSnapshot    Json?               @map("translations_snapshot")
   distanceKmSnapshot      Decimal?            @map("distance_km_snapshot") @db.Decimal(6, 2)
   /// Arrival date (always the booking day — same-day orders only) and arrival time "HH:mm".
   date                    DateTime            @db.Date
@@ -298,10 +310,10 @@ model RestaurantBooking {
   createdAt               DateTime            @default(now()) @map("created_at")
   updatedAt               DateTime            @updatedAt @map("updated_at")
 
-  restaurant     Restaurant     @relation(fields: [restaurantId], references: [id])
-  restaurantUser RestaurantUser @relation(fields: [restaurantUserId], references: [id])
-  payment        Payment        @relation(fields: [paymentId], references: [id])
-  table          DiningTable?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  restaurant     Restaurant       @relation(fields: [restaurantId], references: [id])
+  restaurantUser RestaurantUser   @relation(fields: [restaurantUserId], references: [id])
+  payment        Payment          @relation(fields: [paymentId], references: [id])
+  table          DiningTable?     @relation(fields: [tableId], references: [id], onDelete: SetNull)
   preorder       BookingPreorder?
   notifications  Notification[]
 
@@ -314,12 +326,12 @@ model RestaurantBooking {
 }
 
 model BookingPreorder {
-  id          String   @id @default(uuid())
-  bookingId   String   @unique @map("booking_id")
-  subtotal    Decimal  @default(0) @db.Decimal(10, 2)
-  total       Decimal  @default(0) @db.Decimal(10, 2)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  bookingId String   @unique @map("booking_id")
+  subtotal  Decimal  @default(0) @db.Decimal(10, 2)
+  total     Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   booking RestaurantBooking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   items   BookingPreorderItem[]
@@ -328,15 +340,17 @@ model BookingPreorder {
 }
 
 model BookingPreorderItem {
-  id         String   @id @default(uuid())
-  preorderId String   @map("preorder_id")
-  menuItemId String   @map("menu_item_id")
-  itemName   String   @map("item_name")
-  unitPrice  Decimal  @map("unit_price") @db.Decimal(10, 2)
-  quantity   Int
-  note       String?  @db.Text
-  lineTotal  Decimal  @map("line_total") @db.Decimal(10, 2)
-  createdAt  DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid())
+  preorderId   String   @map("preorder_id")
+  menuItemId   String   @map("menu_item_id")
+  itemName     String   @map("item_name")
+  /// Item name translations as they were when the order was placed, e.g. { "hi": { "name": "..." } }.
+  translations Json?
+  unitPrice    Decimal  @map("unit_price") @db.Decimal(10, 2)
+  quantity     Int
+  note         String?  @db.Text
+  lineTotal    Decimal  @map("line_total") @db.Decimal(10, 2)
+  createdAt    DateTime @default(now()) @map("created_at")
 
   preorder BookingPreorder @relation(fields: [preorderId], references: [id], onDelete: Cascade)
 

@@ -488,6 +488,18 @@ h1, h2, h3, .brand { font-family: "Manrope", "Noto Sans Devanagari", "Noto Sans 
 .choice-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fafcfb; }
 .choice-panel > strong { width: 100%; color: var(--ink); font-size: 13px; }
 .choice-panel > small { color: var(--muted); font-size: 11px; }
+.translations-editor { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fafcfb; }
+.translations-editor__head { display: flex; flex-direction: column; gap: 3px; }
+.translations-editor__head strong { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font-size: 13px; }
+.translations-editor__head small { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.translations-editor__tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.translations-editor__tab { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: white; color: #53615d; font-size: 12.5px; font-weight: 600; }
+.translations-editor__tab:hover { border-color: #d5cdbf; }
+.translations-editor__tab.active { border-color: var(--navy); background: var(--navy); color: white; }
+.translations-editor__count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--brand-pale); color: var(--brand-dark); font-size: 10px; font-weight: 800; }
+.translations-editor__tab.is-complete .translations-editor__count { background: #e3f4ea; color: #1d7a45; }
+.translations-editor__tab.active .translations-editor__count { background: rgba(255,255,255,.18); color: white; }
+.translations-editor__fields { gap: 12px; }
 .check-option { min-height: 42px; padding: 0 13px; flex-direction: row !important; align-items: center; border: 1px solid var(--line); border-radius: 11px; background: #fafcfb; }
 .check-option input { width: 17px; min-height: 17px; accent-color: var(--brand); }
 .map-picker { display: flex; flex-direction: column; gap: 8px; }

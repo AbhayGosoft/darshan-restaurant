@@ -6,6 +6,7 @@ import { imageUrlSchema, resolveAssetUrl } from "../../utils/images.js";
 import { ApiError, asyncHandler, idParam, sendSuccess, validateBody, validateQuery } from "../../utils/http.js";
 import { pagination } from "../../utils/query.js";
 import { isValidTime24, toMinutes } from "../../utils/slotTime.js";
+import { RESTAURANT_TRANSLATABLE_FIELDS, translationsForAdmin, translationsInputSchema } from "../../i18n/translations.js";
 
 // OpenAPI docs: src/docs/admin/restaurants.docs.ts
 const router = Router();
@@ -41,6 +42,7 @@ const toAdminRestaurant = (restaurant: any) => ({
   maxPartySize: restaurant.maxPartySize,
   opensAt: restaurant.opensAt,
   closesAt: restaurant.closesAt,
+  translations: translationsForAdmin(restaurant.translations),
   status: restaurant.status,
   createdAt: restaurant.createdAt,
 });
@@ -120,6 +122,8 @@ const createSchema = z.object({
   /** Daily opening hours, 24h "HH:mm"; customers can only pick arrival times inside them. */
   opensAt: z.string().refine(isValidTime24, { message: 'opensAt must look like "09:00"' }).optional(),
   closesAt: z.string().refine(isValidTime24, { message: 'closesAt must look like "23:00"' }).optional(),
+  /** Other-language copies of the text fields: { "hi": { "name": "...", "about": "..." } }. Replaces the stored set on update. */
+  translations: translationsInputSchema(RESTAURANT_TRANSLATABLE_FIELDS).optional(),
 });
 
 const assertOpeningHours = (opensAt: string, closesAt: string) => {

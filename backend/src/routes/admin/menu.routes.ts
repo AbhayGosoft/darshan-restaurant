@@ -4,6 +4,7 @@ import { prisma } from "../../lib/prisma.js";
 import { requireAdminAuth, requireRestaurantAccess } from "../../middleware/auth.js";
 import { imageUrlSchema, resolveAssetUrl } from "../../utils/images.js";
 import { ApiError, asyncHandler, idParam, sendSuccess, validateBody } from "../../utils/http.js";
+import { MENU_CATEGORY_TRANSLATABLE_FIELDS, MENU_ITEM_TRANSLATABLE_FIELDS, translationsForAdmin, translationsInputSchema } from "../../i18n/translations.js";
 
 // Mounted at /api/admin/restaurants/:restaurantId/menu (mergeParams so :restaurantId is visible here).
 // OpenAPI docs: src/docs/admin/menu.docs.ts
@@ -19,6 +20,7 @@ const toItem = (item: any) => ({
   isVeg: item.isVeg,
   isActive: item.isActive,
   sortOrder: item.sortOrder,
+  translations: translationsForAdmin(item.translations),
 });
 
 const toCategory = (category: any) => ({
@@ -26,6 +28,7 @@ const toCategory = (category: any) => ({
   name: category.name,
   sortOrder: category.sortOrder,
   isActive: category.isActive,
+  translations: translationsForAdmin(category.translations),
   items: category.items?.map(toItem) ?? [],
 });
 
@@ -46,6 +49,8 @@ const categorySchema = z.object({
   name: z.string().trim().min(1),
   sortOrder: z.coerce.number().int().default(0),
   isActive: z.boolean().default(true),
+  /** { "hi": { "name": "..." } } — replaces the stored set on update. */
+  translations: translationsInputSchema(MENU_CATEGORY_TRANSLATABLE_FIELDS).optional(),
 });
 
 router.post(
@@ -122,6 +127,8 @@ const itemSchema = z.object({
   isVeg: z.boolean().default(true),
   isActive: z.boolean().default(true),
   sortOrder: z.coerce.number().int().default(0),
+  /** { "hi": { "name": "...", "description": "..." } } — replaces the stored set on update. */
+  translations: translationsInputSchema(MENU_ITEM_TRANSLATABLE_FIELDS).optional(),
 });
 
 router.post(

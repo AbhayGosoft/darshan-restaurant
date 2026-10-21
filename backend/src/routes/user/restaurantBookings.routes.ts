@@ -13,7 +13,7 @@ router.get(
   "/:id",
   asyncHandler(async (req, res) => {
     const id = idParam(req);
-    const booking = await getBookingForCustomer(req.customer!.id, id);
+    const booking = await getBookingForCustomer(req.customer!.id, id, req.lang);
     sendSuccess(res, booking);
   }),
 );
@@ -33,7 +33,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const id = idParam(req);
     const body = validateBody(modifySchema, req.body);
-    const booking = await modifyBooking(req.customer!.id, id, body);
+    const booking = await modifyBooking(req.customer!.id, id, body, req.lang);
     sendSuccess(res, booking, "Booking updated");
   }),
 );
@@ -45,14 +45,14 @@ router.post(
   asyncHandler(async (req, res) => {
     const id = idParam(req);
     const body = validateBody(cancelSchema, req.body);
-    const result = await cancelBooking(req.customer!.id, id, body.reason);
+    const result = await cancelBooking(req.customer!.id, id, body.reason, req.lang);
     sendSuccess(res, result, "Booking cancelled");
   }),
 );
 
 // const preorderSchema = z.object({ items: z.array(z.object({ menuItemId: z.string().uuid(), quantity: z.coerce.number().int().min(1).max(50), note: z.string().trim().max(500).optional() })).max(50) });
 router.get("/:id/preorder", requireCustomerAuth, asyncHandler(async (req, res) => {
-  sendSuccess(res, await getPreorderForCustomer(req.customer!.id, idParam(req)));
+  sendSuccess(res, await getPreorderForCustomer(req.customer!.id, idParam(req), req.lang));
 }));
 // Menu items are paid for up front now (payment amount = item total), so editing them after
 // payment would desync what was paid from what was ordered. Disabled until refunds/top-ups exist.

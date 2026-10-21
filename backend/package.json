@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed-translations": "tsx prisma/seed-translations.ts",
     "create-admin": "tsx prisma/create-admin.ts",
     "test": "vitest run",
     "test:watch": "vitest"

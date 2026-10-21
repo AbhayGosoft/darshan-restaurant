@@ -28,9 +28,9 @@ export const idParam = (req: Request, name = "id") => {
   return value;
 };
 
-/** Standard success envelope: { status: true, message, data }. */
+/** Standard success envelope: { status: true, message, data }, plus `lang` on customer-app routes. */
 export const sendSuccess = (res: Response, data: unknown, message = "OK", statusCode = 200) => {
-  res.status(statusCode).json({ status: true, message, data });
+  res.status(statusCode).json({ status: true, message, ...(res.locals.lang ? { lang: res.locals.lang } : {}), data });
 };
 
 export const errorHandler = (

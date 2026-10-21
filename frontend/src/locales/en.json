@@ -414,5 +414,10 @@
     "newBooking": "New booking · {{restaurant}}",
     "empty": "No bookings yet. New bookings will show up here.",
     "loadError": "Couldn't load notifications."
+  },
+  "translations": {
+    "title": "Other languages",
+    "hint": "Optional. Shown in the Darshan app to customers using that language; any field left blank shows the English text.",
+    "complete": "All fields translated"
   }
 }

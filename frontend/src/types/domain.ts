@@ -1,3 +1,5 @@
+import type { Translations } from "@/i18n/content-languages";
+
 export type AdminRole = "ADMIN" | "SUPERADMIN";
 export type RecordStatus = "ACTIVE" | "INACTIVE";
 
@@ -17,6 +19,7 @@ export interface RestaurantCategory {
   label: string;
   sortOrder: number;
   isActive: boolean;
+  translations?: Translations;
 }
 
 export interface RestaurantAddress {
@@ -61,6 +64,8 @@ export interface Restaurant {
   status: RecordStatus;
   createdAt?: string;
   distanceKm?: number | null;
+  /** Admin responses only: other-language copies of the text fields. */
+  translations?: Translations;
 }
 
 export interface MenuItem {
@@ -72,6 +77,7 @@ export interface MenuItem {
   isVeg: boolean;
   isActive: boolean;
   sortOrder: number;
+  translations?: Translations;
 }
 
 export interface MenuCategory {
@@ -79,6 +85,7 @@ export interface MenuCategory {
   name: string;
   sortOrder: number;
   isActive: boolean;
+  translations?: Translations;
   items: MenuItem[];
 }
 

@@ -9,6 +9,8 @@ import type { HardDeleteResult, RestaurantCategory } from "@/types/domain";
 import { Button } from "@/components/ui/Button";
 import { LoadingGrid, StateView } from "@/components/ui/StateView";
 import { ConfirmDialog, DialogFooter, FieldError, Notice, ResourceDialog, Req, StatusTabs, cleanBody, hardDeleteMessage, type ListStatus } from "@/components/resource/dialog-kit";
+import { TranslationsEditor } from "@/components/resource/TranslationsEditor";
+import type { Translations } from "@/i18n/content-languages";
 
 type CategoryForm = { label: string; sortOrder: number; isActive: boolean };
 
@@ -20,15 +22,16 @@ export function CategoriesSettingsPage() {
   const [view, setView] = useState<ListStatus>("active");
   const [notice, setNotice] = useState("");
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CategoryForm>({ defaultValues: { label: "", sortOrder: 0, isActive: true } });
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<CategoryForm>({ defaultValues: { label: "", sortOrder: 0, isActive: true } });
+  const [translations, setTranslations] = useState<Translations>({});
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["restaurant-categories"] });
 
   const save = useMutation({
     mutationFn: (data: CategoryForm) =>
       dialog !== "new" && dialog
-        ? api(`/admin/categories/${dialog.id}`, { method: "PATCH", body: cleanBody(data) })
-        : api("/admin/categories", { method: "POST", body: cleanBody(data) }),
+        ? api(`/admin/categories/${dialog.id}`, { method: "PATCH", body: cleanBody({ ...data, translations }) })
+        : api("/admin/categories", { method: "POST", body: cleanBody({ ...data, translations }) }),
     onSuccess: async () => { await invalidate(); setDialog(null); },
   });
 
@@ -37,8 +40,8 @@ export function CategoriesSettingsPage() {
     onSuccess: (result, category) => { setNotice(hardDeleteMessage(category.label, result)); setCategoryToDelete(null); void invalidate(); },
   });
 
-  const openNew = () => { reset({ label: "", sortOrder: categories.data?.length ?? 0, isActive: true }); setDialog("new"); };
-  const openEdit = (category: RestaurantCategory) => { reset({ label: category.label, sortOrder: category.sortOrder, isActive: category.isActive }); setDialog(category); };
+  const openNew = () => { reset({ label: "", sortOrder: categories.data?.length ?? 0, isActive: true }); setTranslations({}); setDialog("new"); };
+  const openEdit = (category: RestaurantCategory) => { reset({ label: category.label, sortOrder: category.sortOrder, isActive: category.isActive }); setTranslations(category.translations ?? {}); setDialog(category); };
 
   if (categories.isLoading) return <LoadingGrid />;
   if (categories.isError) return <StateView title={t("categories.loadError")} message={t("common.loadErrorMessage")} action={() => void categories.refetch()} />;
@@ -82,6 +85,7 @@ export function CategoriesSettingsPage() {
               </label>
               <label>{t("common.sortOrder")}<input type="number" {...register("sortOrder", { valueAsNumber: true })} /></label>
               <label className="check-option"><input type="checkbox" {...register("isActive")} /><span>{t("common.active")}</span></label>
+              <TranslationsEditor value={translations} onChange={setTranslations} fields={[{ key: "label", label: t("categories.label"), source: watch("label") }]} />
             </div>
             {save.error && <div className="form-error">{save.error.message}</div>}
             <DialogFooter onClose={() => setDialog(null)} loading={save.isPending} label={dialog === "new" ? t("categories.add") : t("common.saveChanges")} />

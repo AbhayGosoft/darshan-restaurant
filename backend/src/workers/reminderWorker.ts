@@ -1,8 +1,7 @@
 import { Worker } from "bullmq";
 import { prisma } from "../lib/prisma.js";
 import { redisConnectionOptions } from "../redis/connection.js";
-import { notifyCustomer } from "../services/notificationService.js";
-import { to12Hour } from "../utils/slotTime.js";
+import { bookingNotificationMessage, notifyCustomer } from "../services/notificationService.js";
 import { ACTIVE_BOOKING_STATUSES } from "../constants/bookingStatus.js";
 
 export const createReminderWorker = () =>
@@ -17,8 +16,7 @@ export const createReminderWorker = () =>
         restaurantUserId: booking.restaurantUserId,
         type: "BOOKING_REMINDER",
         bookingId: booking.id,
-        title: "Your order is coming up",
-        body: `Reminder: you're expected at ${booking.restaurantNameSnapshot} at ${to12Hour(booking.time)} today for order ${booking.humanBookingId}.`,
+        message: bookingNotificationMessage("reminder", booking),
       });
     },
     { connection: redisConnectionOptions(), concurrency: 5 },

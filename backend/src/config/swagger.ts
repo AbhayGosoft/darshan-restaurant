@@ -1,5 +1,6 @@
 import swaggerJsdoc from "swagger-jsdoc";
 import { env } from "./env.js";
+import { SUPPORTED_LANGUAGES, TRANSLATION_LANGUAGES } from "../i18n/languages.js";
 
 /**
  * OpenAPI spec generated from `@openapi` JSDoc blocks in src/docs/** (mirrors src/routes/**
@@ -17,7 +18,13 @@ const options: swaggerJsdoc.Options = {
       version: "1.0.0",
       description:
         "REST API for the Restaurant admin/customer platform: customer-facing discovery/booking/payments, " +
-        "the admin/superadmin back office, and the Darshan Admin central-auth server-to-server bridge.",
+        "the admin/superadmin back office, and the Darshan Admin central-auth server-to-server bridge.\n\n" +
+        "**Languages.** Every `User:` endpoint accepts `?lang=` (or an `Accept-Language` header; `?lang=` wins) with one of " +
+        `${SUPPORTED_LANGUAGES.map((lang) => `\`${lang}\``).join(", ")}. ` +
+        "Restaurant, category and menu text is returned in that language, falling back to English per field when no translation exists; " +
+        "unknown or missing languages mean English. The response envelope carries the language used as `lang` (and the `Content-Language` header). " +
+        "When a signed-in customer sends a language it is saved, and push notifications are written in it. " +
+        "Admin endpoints are not localized: they return English plus the full `translations` object for editing.",
     },
     servers: [{ url: `${env.publicOrigin}`, description: env.nodeEnv === "production" ? "Production" : "Current environment" }],
     // Tags are role-based first, resource-based second ("User: X" / "Admin: X"), so Swagger UI
@@ -70,12 +77,22 @@ const options: swaggerJsdoc.Options = {
           description: "Server-to-server app key for the Darshan Admin (central auth) bridge. Distinct trust boundary from ClientKey.",
         },
       },
+      parameters: {
+        Lang: {
+          in: "query",
+          name: "lang",
+          required: false,
+          schema: { type: "string", enum: [...SUPPORTED_LANGUAGES], default: "en" },
+          description: "Response language. Falls back to Accept-Language, then English.",
+        },
+      },
       schemas: {
         SuccessEnvelope: {
           type: "object",
           properties: {
             status: { type: "boolean", example: true },
             message: { type: "string", example: "OK" },
+            lang: { type: "string", enum: [...SUPPORTED_LANGUAGES], example: "hi", description: "Customer-app (User:) endpoints only: the language the response is in." },
             data: {},
           },
           required: ["status", "message"],
@@ -106,6 +123,14 @@ const options: swaggerJsdoc.Options = {
             role: { type: "string", enum: ["ADMIN", "SUPERADMIN"] },
             status: { type: "string", enum: ["ACTIVE", "INACTIVE"] },
           },
+        },
+        Translations: {
+          type: "object",
+          description:
+            "Other-language copies of a record's text fields, keyed by language then field. English stays in the regular fields. " +
+            "Blank values are dropped; on update the object replaces the stored one as a whole (send {} to clear).",
+          properties: Object.fromEntries(TRANSLATION_LANGUAGES.map((lang) => [lang, { type: "object", additionalProperties: { type: "string" } }])),
+          example: { hi: { name: "पनीर टिक्का", description: "तंदूर में पका पनीर" }, ta: { name: "பனீர் டிக்கா" } },
         },
         Pagination: {
           type: "object",
@@ -144,4 +169,18 @@ const options: swaggerJsdoc.Options = {
   apis: ["./src/docs/**/*.ts", "./dist/src/docs/**/*.js"],
 };
 
-export const swaggerSpec = swaggerJsdoc(options);
+const USER_PATH_PREFIXES = ["/api/auth", "/api/restaurants", "/api/payments", "/api/my-restaurant-bookings", "/api/restaurant-bookings"];
+
+/** Adds the shared `lang` parameter to every customer-app operation (see resolveLanguage middleware). */
+const withLangParameter = (spec: any) => {
+  for (const [path, operations] of Object.entries<Record<string, any>>(spec.paths ?? {})) {
+    if (!USER_PATH_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) continue;
+    for (const operation of Object.values(operations)) {
+      if (!operation || typeof operation !== "object") continue;
+      operation.parameters = [...(operation.parameters ?? []), { $ref: "#/components/parameters/Lang" }];
+    }
+  }
+  return spec;
+};
+
+export const swaggerSpec = withLangParameter(swaggerJsdoc(options));

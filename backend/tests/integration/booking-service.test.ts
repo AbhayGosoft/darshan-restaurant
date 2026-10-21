@@ -120,6 +120,35 @@ describe("createBooking", () => {
     expect(result.canModify).toBe(true);
   });
 
+  it("snapshots translations, answers in the requested language and notifies in the customer's saved language", async () => {
+    mockHappyPath();
+    prisma.restaurant.findUnique.mockResolvedValue({ ...activeRestaurant, translations: { hi: { name: "श्री श्याम रेस्टोरेंट", about: "x" }, gu: { name: "શ્રી શ્યામ રેસ્ટોરન્ટ" } } });
+    prisma.menuItem.findMany.mockResolvedValue([{ id: "item-1", name: "Paneer Tikka", price: "49.50", translations: { hi: { name: "पनीर टिक्का", description: "y" } } }]);
+    prisma.restaurantUser.findUnique.mockResolvedValue({ playerId: null, language: "gu" });
+
+    const result = await service.createBooking("customer-A", "r1", validInput, "hi");
+
+    const data = prisma.restaurantBooking.create.mock.calls[0][0].data;
+    expect(data.translationsSnapshot).toEqual({ hi: { name: "श्री श्याम रेस्टोरेंट" }, gu: { name: "શ્રી શ્યામ રેસ્ટોરન્ટ" } });
+    expect(data.preorder.create.items.create[0].translations).toEqual({ hi: { name: "पनीर टिक्का" } });
+    expect(data.restaurantNameSnapshot).toBe("Shree Shyam Restaurant");
+    expect(result.restaurantName).toBe("श्री श्याम रेस्टोरेंट");
+    expect(result.statusLabel).toBe("ऑर्डर दिया गया");
+
+    const notification = prisma.notification.create.mock.calls[0][0].data;
+    expect(notification.title).toBe("ઓર્ડર આપવામાં આવ્યો");
+    expect(notification.body).toContain("શ્રી શ્યામ રેસ્ટોરન્ટ");
+  });
+
+  it("falls back to English text when no language or translation exists", async () => {
+    mockHappyPath();
+    prisma.restaurantUser.findUnique.mockResolvedValue({ playerId: null, language: "en" });
+    const result = await service.createBooking("customer-A", "r1", validInput);
+    expect(result.restaurantName).toBe("Shree Shyam Restaurant");
+    expect(result.statusLabel).toBe("Order placed");
+    expect(prisma.notification.create.mock.calls[0][0].data.title).toBe("Order placed");
+  });
+
   it("accepts an explicit date only when it is today", async () => {
     mockHappyPath();
     await expect(service.createBooking("customer-A", "r1", { ...validInput, date: TODAY })).resolves.toBeDefined();

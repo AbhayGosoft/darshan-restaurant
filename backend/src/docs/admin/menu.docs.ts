@@ -46,6 +46,7 @@
  *             type: object
  *             required: [name]
  *             properties:
+ *               translations: { $ref: "#/components/schemas/Translations" }
  *               name: { type: string }
  *               sortOrder: { type: integer, default: 0 }
  *               isActive: { type: boolean, default: true }
@@ -87,6 +88,7 @@
  *           schema:
  *             type: object
  *             properties:
+ *               translations: { $ref: "#/components/schemas/Translations" }
  *               name: { type: string }
  *               sortOrder: { type: integer }
  *               isActive: { type: boolean }
@@ -164,6 +166,7 @@
  *             type: object
  *             required: [name, price]
  *             properties:
+ *               translations: { $ref: "#/components/schemas/Translations" }
  *               name: { type: string }
  *               description: { type: string }
  *               price: { type: number, minimum: 0 }
@@ -211,6 +214,7 @@
  *           schema:
  *             type: object
  *             properties:
+ *               translations: { $ref: "#/components/schemas/Translations" }
  *               name: { type: string }
  *               description: { type: string }
  *               price: { type: number, minimum: 0 }

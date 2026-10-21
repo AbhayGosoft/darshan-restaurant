@@ -64,6 +64,7 @@
  *             type: object
  *             required: [name, cuisineLabel, prepTimeMin, prepTimeMax, priceForTwo, addressLine, city, phone, latitude, longitude]
  *             properties:
+ *               translations: { $ref: "#/components/schemas/Translations" }
  *               name: { type: string }
  *               banner: { type: string }
  *               gallery: { type: array, items: { type: string } }

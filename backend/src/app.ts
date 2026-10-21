@@ -12,6 +12,7 @@ import type { Request } from "express";
 import { env } from "./config/env.js";
 import { errorHandler } from "./utils/http.js";
 import { requireClientKey } from "./middleware/auth.js";
+import { resolveLanguage } from "./middleware/language.js";
 import { logger } from "./modules/logger.js";
 import { swaggerSpec } from "./config/swagger.js";
 
@@ -84,7 +85,9 @@ app.use("/api/restaurant", restaurantCentralAuthRoutes);
 
 app.use("/api", requireClientKey);
 
-// User (customer app) — only endpoints the app's own users may call.
+// User (customer app) — only endpoints the app's own users may call. These answer in the
+// language the app asks for (?lang= / Accept-Language), English by default.
+app.use(["/api/auth", "/api/restaurants", "/api/payments", "/api/my-restaurant-bookings", "/api/restaurant-bookings"], resolveLanguage);
 app.use("/api/auth", userAuthRoutes);
 app.use("/api/restaurants", userRestaurantsRoutes);
 app.use("/api/payments", userPaymentsRoutes);

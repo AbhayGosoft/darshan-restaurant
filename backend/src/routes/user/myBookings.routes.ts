@@ -16,7 +16,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const query = validateQuery(querySchema, req.query);
     // req.user's identity comes only from the verified JWT — never from a client-supplied id.
-    const bookings = await listMyBookings(req.customer!.id, query.filter);
+    const bookings = await listMyBookings(req.customer!.id, query.filter, req.lang);
     sendSuccess(res, bookings);
   }),
 );

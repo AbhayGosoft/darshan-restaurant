@@ -11,6 +11,8 @@ import type { HardDeleteResult, MenuCategory, MenuItem } from "@/types/domain";
 import { Button } from "@/components/ui/Button";
 import { LoadingGrid, StateView } from "@/components/ui/StateView";
 import { ConfirmDialog, DialogFooter, FieldError, ImageManager, Notice, ResourceDialog, Req, StatusTabs, cleanBody, hardDeleteMessage, type ListStatus } from "@/components/resource/dialog-kit";
+import { TranslationsEditor } from "@/components/resource/TranslationsEditor";
+import type { Translations } from "@/i18n/content-languages";
 
 type CategoryForm = { name: string; sortOrder: number; isActive: boolean };
 type ItemForm = { name: string; description: string; price: number; isVeg: boolean; isActive: boolean; sortOrder: number };
@@ -24,6 +26,8 @@ export function MenuSettingsPage() {
   const [categoryDialog, setCategoryDialog] = useState<MenuCategory | null | "new">(null);
   const [itemDialog, setItemDialog] = useState<{ categoryId: string; item: MenuItem | null } | null>(null);
   const [itemImage, setItemImage] = useState<{ imageUrl: string; sortOrder: number }[]>([]);
+  const [categoryTranslations, setCategoryTranslations] = useState<Translations>({});
+  const [itemTranslations, setItemTranslations] = useState<Translations>({});
   const [deleteTarget, setDeleteTarget] = useState<{ type: "category" | "item"; id: string; name: string } | null>(null);
   const [view, setView] = useState<ListStatus>("active");
   const [notice, setNotice] = useState("");
@@ -33,14 +37,14 @@ export function MenuSettingsPage() {
   const saveCategory = useMutation({
     mutationFn: (data: CategoryForm) =>
       categoryDialog !== "new" && categoryDialog
-        ? api(`${base}/categories/${categoryDialog.id}`, { method: "PATCH", body: cleanBody(data) })
-        : api(`${base}/categories`, { method: "POST", body: cleanBody(data) }),
+        ? api(`${base}/categories/${categoryDialog.id}`, { method: "PATCH", body: cleanBody({ ...data, translations: categoryTranslations }) })
+        : api(`${base}/categories`, { method: "POST", body: cleanBody({ ...data, translations: categoryTranslations }) }),
     onSuccess: async () => { await invalidate(); setCategoryDialog(null); },
   });
 
   const saveItem = useMutation({
     mutationFn: (data: ItemForm) => {
-      const body = cleanBody({ ...data, image: itemImage[0]?.imageUrl });
+      const body = cleanBody({ ...data, image: itemImage[0]?.imageUrl, translations: itemTranslations });
       return itemDialog?.item
         ? api(`${base}/items/${itemDialog.item.id}`, { method: "PATCH", body })
         : api(`${base}/categories/${itemDialog!.categoryId}/items`, { method: "POST", body });
@@ -77,7 +81,7 @@ export function MenuSettingsPage() {
 
   const renderCategoryActions = (category: MenuCategory) => (
     <>
-      <button type="button" className="icon-button" aria-label={t("menu.editCategory")} onClick={() => { categoryForm.reset({ name: category.name, sortOrder: category.sortOrder, isActive: category.isActive }); setCategoryDialog(category); }}><Pencil size={15} /></button>
+      <button type="button" className="icon-button" aria-label={t("menu.editCategory")} onClick={() => { categoryForm.reset({ name: category.name, sortOrder: category.sortOrder, isActive: category.isActive }); setCategoryTranslations(category.translations ?? {}); setCategoryDialog(category); }}><Pencil size={15} /></button>
       <button type="button" className="icon-button icon-button--danger" aria-label={t("menu.deleteCategoryAria")} title={t("common.deletePermanently")} onClick={() => { remove.reset(); setDeleteTarget({ type: "category", id: category.id, name: category.name }); }}><Trash2 size={15} /></button>
     </>
   );
@@ -90,7 +94,7 @@ export function MenuSettingsPage() {
         <small>{showCategory ? category.name : item.description}</small>
       </div>
       <span className="menu-item-row__price">₹{item.price}</span>
-      <button type="button" className="icon-button" aria-label={t("menu.editItem")} onClick={() => { itemForm.reset({ name: item.name, description: item.description ?? "", price: item.price, isVeg: item.isVeg, isActive: item.isActive, sortOrder: item.sortOrder }); setItemImage(item.image ? [{ imageUrl: item.image, sortOrder: 0 }] : []); setItemDialog({ categoryId: category.id, item }); }}><Pencil size={14} /></button>
+      <button type="button" className="icon-button" aria-label={t("menu.editItem")} onClick={() => { itemForm.reset({ name: item.name, description: item.description ?? "", price: item.price, isVeg: item.isVeg, isActive: item.isActive, sortOrder: item.sortOrder }); setItemImage(item.image ? [{ imageUrl: item.image, sortOrder: 0 }] : []); setItemTranslations(item.translations ?? {}); setItemDialog({ categoryId: category.id, item }); }}><Pencil size={14} /></button>
       <button type="button" className="icon-button icon-button--danger" aria-label={t("menu.deleteItemAria")} title={t("common.deletePermanently")} onClick={() => { remove.reset(); setDeleteTarget({ type: "item", id: item.id, name: item.name }); }}><Trash2 size={14} /></button>
     </div>
   );
@@ -99,7 +103,7 @@ export function MenuSettingsPage() {
     <main className="page">
       <section className="resource-head">
         <span className="eyebrow"><UtensilsCrossed size={14} /> {t("menu.title")}</span>
-        <Button type="button" onClick={() => { categoryForm.reset({ name: "", sortOrder: categories.data?.length ?? 0, isActive: true }); setCategoryDialog("new"); }}><Plus size={17} /> {t("menu.addCategory")}</Button>
+        <Button type="button" onClick={() => { categoryForm.reset({ name: "", sortOrder: categories.data?.length ?? 0, isActive: true }); setCategoryTranslations({}); setCategoryDialog("new"); }}><Plus size={17} /> {t("menu.addCategory")}</Button>
       </section>
 
       <StatusTabs value={view} onChange={setView} activeCount={activeCategories.length} inactiveCount={inactiveCategories.length + inactiveItems.length} />
@@ -117,7 +121,7 @@ export function MenuSettingsPage() {
                     <div><strong>{category.name}</strong></div>
                     <div className="menu-category-card__actions">
                       {renderCategoryActions(category)}
-                      <Button type="button" variant="secondary" onClick={() => { itemForm.reset({ name: "", description: "", price: 0, isVeg: true, isActive: true, sortOrder: category.items.length }); setItemImage([]); setItemDialog({ categoryId: category.id, item: null }); }}><Plus size={15} /> {t("menu.addItem")}</Button>
+                      <Button type="button" variant="secondary" onClick={() => { itemForm.reset({ name: "", description: "", price: 0, isVeg: true, isActive: true, sortOrder: category.items.length }); setItemImage([]); setItemTranslations({}); setItemDialog({ categoryId: category.id, item: null }); }}><Plus size={15} /> {t("menu.addItem")}</Button>
                     </div>
                   </header>
                   <div className="menu-item-list">
@@ -172,6 +176,7 @@ export function MenuSettingsPage() {
               </label>
               <label>{t("common.sortOrder")}<input type="number" {...categoryForm.register("sortOrder", { valueAsNumber: true })} /></label>
               <label className="check-option"><input type="checkbox" {...categoryForm.register("isActive")} /><span>{t("common.active")}</span></label>
+              <TranslationsEditor value={categoryTranslations} onChange={setCategoryTranslations} fields={[{ key: "name", label: t("menu.categoryName"), source: categoryForm.watch("name") }]} />
             </div>
             {saveCategory.error && <div className="form-error">{saveCategory.error.message}</div>}
             <DialogFooter onClose={() => setCategoryDialog(null)} loading={saveCategory.isPending} label={categoryDialog === "new" ? t("menu.addCategory") : t("common.saveChanges")} />
@@ -193,6 +198,14 @@ export function MenuSettingsPage() {
               <label>{t("common.sortOrder")}<input type="number" {...itemForm.register("sortOrder", { valueAsNumber: true })} /></label>
               <label className="check-option"><input type="checkbox" {...itemForm.register("isVeg")} /><span>{t("menu.vegetarian")}</span></label>
               <label className="check-option"><input type="checkbox" {...itemForm.register("isActive")} /><span>{t("common.active")}</span></label>
+              <TranslationsEditor
+                value={itemTranslations}
+                onChange={setItemTranslations}
+                fields={[
+                  { key: "name", label: t("menu.itemName"), source: itemForm.watch("name") },
+                  { key: "description", label: t("menu.description"), source: itemForm.watch("description"), multiline: true },
+                ]}
+              />
             </div>
             {saveItem.error && <div className="form-error">{saveItem.error.message}</div>}
             <DialogFooter onClose={() => setItemDialog(null)} loading={saveItem.isPending} label={itemDialog.item ? t("common.saveChanges") : t("menu.addItem")} />

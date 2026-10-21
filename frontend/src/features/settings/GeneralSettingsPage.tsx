@@ -10,6 +10,8 @@ import type { Restaurant, RestaurantCategory } from "@/types/domain";
 import { Button } from "@/components/ui/Button";
 import { LoadingGrid, StateView } from "@/components/ui/StateView";
 import { CheckboxList, FieldError, ImageManager, PhoneField, Req, cleanBody, normalizeCover } from "@/components/resource/dialog-kit";
+import { TranslationsEditor } from "@/components/resource/TranslationsEditor";
+import type { Translations } from "@/i18n/content-languages";
 
 type GeneralForm = {
   name: string;
@@ -51,8 +53,10 @@ export function GeneralSettingsPage() {
   const [banner, setBanner] = useState<{ imageUrl: string; sortOrder: number }[]>([]);
   const [gallery, setGallery] = useState<{ imageUrl: string; sortOrder: number }[]>([]);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [translations, setTranslations] = useState<Translations>({});
   const [saved, setSaved] = useState(false);
-  const { register, control, handleSubmit, reset, formState: { errors } } = useForm<GeneralForm>({ defaultValues: emptyForm });
+  const { register, control, handleSubmit, reset, watch, formState: { errors } } = useForm<GeneralForm>({ defaultValues: emptyForm });
+  const english = watch();
 
   useEffect(() => {
     if (!restaurant.data) return;
@@ -72,6 +76,7 @@ export function GeneralSettingsPage() {
     });
     setBanner(r.banner ? [{ imageUrl: r.banner, sortOrder: 0 }] : []);
     setGallery(r.gallery.map((imageUrl, sortOrder) => ({ imageUrl, sortOrder })));
+    setTranslations(r.translations ?? {});
   }, [restaurant.data, reset]);
 
   useEffect(() => {
@@ -89,6 +94,7 @@ export function GeneralSettingsPage() {
           banner: banner[0]?.imageUrl,
           gallery: gallery.map((image) => image.imageUrl),
           categoryIds: selectedCategoryIds,
+          translations,
         }),
       }),
     onSuccess: async (updated) => {
@@ -151,6 +157,20 @@ export function GeneralSettingsPage() {
           <FieldError error={errors.closesAt} />
           <small className="muted">{t("general.openingHoursHint")}</small>
         </label>
+        <TranslationsEditor
+          value={translations}
+          onChange={setTranslations}
+          fields={[
+            { key: "name", label: t("restaurants.nameLabel"), source: english.name },
+            { key: "cuisineLabel", label: t("restaurants.cuisineLabel"), source: english.cuisineLabel },
+            { key: "about", label: t("general.about"), source: english.about, multiline: true },
+            { key: "offerText", label: t("general.offerText"), source: english.offerText },
+            { key: "offerSubText", label: t("general.offerSubText"), source: english.offerSubText },
+            { key: "addressLine", label: t("common.address"), source: english.addressLine, multiline: true },
+            { key: "city", label: t("common.city"), source: english.city },
+            { key: "state", label: t("general.state"), source: english.state },
+          ]}
+        />
       </div>
       {mutation.error && <div className="form-error">{mutation.error.message}</div>}
       <footer className="settings-form__footer">

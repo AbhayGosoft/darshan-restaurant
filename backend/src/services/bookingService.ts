@@ -6,7 +6,7 @@ import { assertArrivalTime } from "./arrivalService.js";
 // import { findAvailableTable } from "./tableService.js";
 import { calculateMenuTotal } from "./paymentService.js";
 import { cancelReminder, scheduleReminder } from "../queues/reminderQueue.js";
-import { notifyCustomer } from "./notificationService.js";
+import { bookingNotificationMessage, notifyCustomer } from "./notificationService.js";
 import { emitToCustomer, emitToRestaurant } from "../socket/server.js";
 import { socketEvents } from "../socket/socketEvents.js";
 import { policy, decideRefund } from "../config/policy.js";
@@ -16,6 +16,9 @@ import { businessNow, combineDateAndTime, formatDateOnly, parseDateOnly } from "
 import { isValidTime12, to12Hour, to24Hour } from "../utils/slotTime.js";
 import { generateHumanBookingId } from "../utils/bookingId.js";
 import { haversineDistanceKm } from "../utils/geo.js";
+import { DEFAULT_LANGUAGE, type Language } from "../i18n/languages.js";
+import { cancellationReasonLabel, statusLabel, type NotificationEvent } from "../i18n/messages.js";
+import { BOOKING_SNAPSHOT_FIELDS, pickTranslations, translator } from "../i18n/translations.js";
 import { CANCELLATION_REASON_BY_LABEL, CANCELLATION_REASON_LABELS, TABLE_PREFERENCE_BY_LABEL, TABLE_PREFERENCE_LABELS } from "../constants/bookingOptions.js";
 import {
   ACTIVE_BOOKING_STATUSES,
@@ -32,48 +35,59 @@ import {
 
 export type { BookingClientStatus } from "../constants/bookingStatus.js";
 
-export const toBookingResponse = (booking: RestaurantBooking & { table?: any; preorder?: any }) => ({
-  id: booking.id,
-  humanBookingId: booking.humanBookingId,
-  restaurantId: booking.restaurantId,
-  restaurantName: booking.restaurantNameSnapshot,
-  restaurantImage: resolveAssetUrl(booking.restaurantImageSnapshot ?? undefined) ?? null,
-  rating: Number(booking.ratingSnapshot),
-  cuisineLabel: booking.cuisineLabelSnapshot,
-  distanceKm: booking.distanceKmSnapshot !== null ? Number(booking.distanceKmSnapshot) : null,
-  /** Arrival date and time. */
-  date: formatDateOnly(booking.date),
-  time: to12Hour(booking.time),
-  people: booking.people,
-  tablePreference: TABLE_PREFERENCE_LABELS[booking.tablePreference],
-  specialRequest: booking.specialRequest ?? "",
-  fullName: booking.fullName,
-  mobileNumber: booking.mobileNumber,
-  email: booking.email ?? "",
-  status: toClientStatus(booking.status),
-  /** What the customer may still do — lets the app show/hide buttons without duplicating the rules. */
-  canCancel: CUSTOMER_CANCELLABLE_STATUSES.includes(booking.status),
-  canModify: CUSTOMER_MODIFIABLE_STATUSES.includes(booking.status),
-  cancellationReason: booking.cancellationReason ? CANCELLATION_REASON_LABELS[booking.cancellationReason] : null,
-  cancelledBy: booking.cancelledBy ? (booking.cancelledBy.toLowerCase() as "customer" | "restaurant") : null,
-  rejectionReason: booking.rejectionReason ?? null,
-  statusTimestamps: {
-    createdAt: booking.createdAt,
-    acknowledgedAt: booking.acknowledgedAt ?? null,
-    preparingAt: booking.preparingAt ?? null,
-    readyAt: booking.readyAt ?? null,
-    completedAt: booking.completedAt ?? null,
-    cancelledAt: booking.cancelledAt ?? null,
-    rejectedAt: booking.rejectedAt ?? null,
-  },
-  advancePaid: Number(booking.advancePaid),
-  table: booking.table ? { id: booking.table.id, name: booking.table.name, capacity: booking.table.capacity, preference: booking.table.preference, section: booking.table.section } : null,
-  preorder: booking.preorder ? { id: booking.preorder.id, subtotal: Number(booking.preorder.subtotal), total: Number(booking.preorder.total), items: booking.preorder.items?.map((item: any) => ({ id: item.id, menuItemId: item.menuItemId, name: item.itemName, unitPrice: Number(item.unitPrice), quantity: item.quantity, note: item.note, lineTotal: Number(item.lineTotal) })) ?? [] } : null,
-  refund:
-    booking.status === "CANCELLED" || booking.status === "REJECTED"
-      ? { eligible: booking.refundEligible ?? false, amount: booking.refundAmount ? Number(booking.refundAmount) : 0 }
-      : undefined,
-});
+/**
+ * Restaurant name, cuisine and item names come from the translations snapshotted when the order
+ * was placed (English when missing); status/cancellation labels are fixed copy in `lang`.
+ */
+export const toBookingResponse = (booking: RestaurantBooking & { table?: any; preorder?: any }, lang: Language = DEFAULT_LANGUAGE) => {
+  const t = translator(booking.translationsSnapshot, lang);
+  return {
+    id: booking.id,
+    humanBookingId: booking.humanBookingId,
+    restaurantId: booking.restaurantId,
+    restaurantName: t("name", booking.restaurantNameSnapshot),
+    restaurantImage: resolveAssetUrl(booking.restaurantImageSnapshot ?? undefined) ?? null,
+    rating: Number(booking.ratingSnapshot),
+    cuisineLabel: t("cuisineLabel", booking.cuisineLabelSnapshot),
+    distanceKm: booking.distanceKmSnapshot !== null ? Number(booking.distanceKmSnapshot) : null,
+    /** Arrival date and time. */
+    date: formatDateOnly(booking.date),
+    time: to12Hour(booking.time),
+    people: booking.people,
+    tablePreference: TABLE_PREFERENCE_LABELS[booking.tablePreference],
+    specialRequest: booking.specialRequest ?? "",
+    fullName: booking.fullName,
+    mobileNumber: booking.mobileNumber,
+    email: booking.email ?? "",
+    status: toClientStatus(booking.status),
+    /** Display text for `status` in the requested language. */
+    statusLabel: statusLabel(booking.status, lang),
+    /** What the customer may still do — lets the app show/hide buttons without duplicating the rules. */
+    canCancel: CUSTOMER_CANCELLABLE_STATUSES.includes(booking.status),
+    canModify: CUSTOMER_MODIFIABLE_STATUSES.includes(booking.status),
+    /** Stable English value (what POST /cancel accepts); use cancellationReasonLabel for display. */
+    cancellationReason: booking.cancellationReason ? CANCELLATION_REASON_LABELS[booking.cancellationReason] : null,
+    cancellationReasonLabel: booking.cancellationReason ? cancellationReasonLabel(booking.cancellationReason, lang) : null,
+    cancelledBy: booking.cancelledBy ? (booking.cancelledBy.toLowerCase() as "customer" | "restaurant") : null,
+    rejectionReason: booking.rejectionReason ?? null,
+    statusTimestamps: {
+      createdAt: booking.createdAt,
+      acknowledgedAt: booking.acknowledgedAt ?? null,
+      preparingAt: booking.preparingAt ?? null,
+      readyAt: booking.readyAt ?? null,
+      completedAt: booking.completedAt ?? null,
+      cancelledAt: booking.cancelledAt ?? null,
+      rejectedAt: booking.rejectedAt ?? null,
+    },
+    advancePaid: Number(booking.advancePaid),
+    table: booking.table ? { id: booking.table.id, name: booking.table.name, capacity: booking.table.capacity, preference: booking.table.preference, section: booking.table.section } : null,
+    preorder: booking.preorder ? { id: booking.preorder.id, subtotal: Number(booking.preorder.subtotal), total: Number(booking.preorder.total), items: booking.preorder.items?.map((item: any) => ({ id: item.id, menuItemId: item.menuItemId, name: translator(item.translations, lang)("name", item.itemName), unitPrice: Number(item.unitPrice), quantity: item.quantity, note: item.note, lineTotal: Number(item.lineTotal) })) ?? [] } : null,
+    refund:
+      booking.status === "CANCELLED" || booking.status === "REJECTED"
+        ? { eligible: booking.refundEligible ?? false, amount: booking.refundAmount ? Number(booking.refundAmount) : 0 }
+        : undefined,
+  };
+};
 
 export type CreateBookingInput = {
   /** Optional — orders are same-day only; when sent it must be today's date. */
@@ -107,7 +121,7 @@ const preparePreorder = async (client: any, restaurantId: string, items: CreateB
   return items.map((item) => {
     const menuItem = byId.get(item.menuItemId)!;
     const unitPrice = Number(menuItem.price);
-    return { menuItemId: menuItem.id, itemName: menuItem.name, unitPrice, quantity: item.quantity, note: item.note, lineTotal: Math.round(unitPrice * item.quantity * 100) / 100 };
+    return { menuItemId: menuItem.id, itemName: menuItem.name, translations: pickTranslations(menuItem.translations, ["name"]), unitPrice, quantity: item.quantity, note: item.note, lineTotal: Math.round(unitPrice * item.quantity * 100) / 100 };
   });
 };
 
@@ -135,7 +149,7 @@ const scheduleArrivalReminder = async (bookingId: string, date: Date, time24: st
   return scheduleReminder(bookingId, reminderAt);
 };
 
-export const createBooking = async (customerId: string, restaurantId: string, input: CreateBookingInput) => {
+export const createBooking = async (customerId: string, restaurantId: string, input: CreateBookingInput, lang: Language = DEFAULT_LANGUAGE) => {
   const restaurant = await getActiveRestaurantOrThrow(restaurantId);
   assertToday(input.date);
   const time24 = assertValidTime(input.time);
@@ -182,6 +196,7 @@ export const createBooking = async (customerId: string, restaurantId: string, in
         restaurantImageSnapshot: restaurant.banner,
         ratingSnapshot: restaurant.rating,
         cuisineLabelSnapshot: restaurant.cuisineLabel,
+        translationsSnapshot: pickTranslations(restaurant.translations, BOOKING_SNAPSHOT_FIELDS),
         distanceKmSnapshot: distanceKm,
         date,
         time: time24,
@@ -209,36 +224,35 @@ export const createBooking = async (customerId: string, restaurantId: string, in
     restaurantUserId: customerId,
     type: "BOOKING_CONFIRMED",
     bookingId: booking.id,
-    title: "Order placed",
-    body: `Your order ${booking.humanBookingId} at ${restaurant.name} is placed for arrival at ${to12Hour(time24)} today. We'll let you know once the restaurant accepts it.`,
+    message: bookingNotificationMessage("placed", booking),
   });
   emitToRestaurant(restaurantId, socketEvents.bookingNew, booking);
 
-  return toBookingResponse(booking);
+  return toBookingResponse(booking, lang);
 };
 
 /** "active" = still in progress, "past" = completed, cancelled or rejected. "upcoming" is accepted as an alias of "active". */
-export const listMyBookings = async (customerId: string, filter?: "active" | "upcoming" | "past") => {
+export const listMyBookings = async (customerId: string, filter?: "active" | "upcoming" | "past", lang: Language = DEFAULT_LANGUAGE) => {
   const statusFilter = !filter ? {} : { status: { in: filter === "past" ? CLOSED_BOOKING_STATUSES : ACTIVE_BOOKING_STATUSES } };
   const bookings = await prisma.restaurantBooking.findMany({
     where: { restaurantUserId: customerId, ...statusFilter },
     orderBy: [{ date: "desc" }, { time: "desc" }, { createdAt: "desc" }],
     include: bookingInclude,
   });
-  return bookings.map(toBookingResponse);
+  return bookings.map((booking) => toBookingResponse(booking, lang));
 };
 
-export const getBookingForCustomer = async (customerId: string, id: string) => {
+export const getBookingForCustomer = async (customerId: string, id: string, lang: Language = DEFAULT_LANGUAGE) => {
   const booking = await prisma.restaurantBooking.findUnique({ where: { id }, include: bookingInclude });
   if (!booking) throw new ApiError(404, "Booking not found");
   if (booking.restaurantUserId !== customerId) throw new ApiError(403, "You do not have access to this booking");
-  return toBookingResponse(booking);
+  return toBookingResponse(booking, lang);
 };
 
 export type ModifyBookingInput = { date?: string; time?: string; people?: number };
 
 /** Customers may change arrival time / party size until the restaurant acknowledges the order. */
-export const modifyBooking = async (customerId: string, id: string, input: ModifyBookingInput) => {
+export const modifyBooking = async (customerId: string, id: string, input: ModifyBookingInput, lang: Language = DEFAULT_LANGUAGE) => {
   const existing = await prisma.restaurantBooking.findUnique({ where: { id } });
   if (!existing) throw new ApiError(404, "Booking not found");
   if (existing.restaurantUserId !== customerId) throw new ApiError(403, "You do not have access to this booking");
@@ -274,12 +288,11 @@ export const modifyBooking = async (customerId: string, id: string, input: Modif
     restaurantUserId: customerId,
     type: "BOOKING_MODIFIED",
     bookingId: updated.id,
-    title: "Order updated",
-    body: `Your order ${updated.humanBookingId} is now for ${updated.people} ${updated.people === 1 ? "person" : "people"}, arriving at ${to12Hour(nextTime24)} today.`,
+    message: bookingNotificationMessage("modified", updated),
   });
   emitToRestaurant(existing.restaurantId, socketEvents.bookingModified, updated);
 
-  return toBookingResponse(updated);
+  return toBookingResponse(updated, lang);
 };
 
 type StatusChange = {
@@ -309,13 +322,13 @@ const applyStatusChange = async (existing: RestaurantBooking, change: StatusChan
 };
 
 /** Push + realtime fan-out after any status change. */
-const announceStatusChange = async (booking: RestaurantBooking, notification: { type: NotificationType; title: string; body: string }) => {
-  await notifyCustomer({ restaurantUserId: booking.restaurantUserId, bookingId: booking.id, ...notification });
+const announceStatusChange = async (booking: RestaurantBooking, notification: Pick<Parameters<typeof notifyCustomer>[0], "type" | "message">) => {
+  const { lang } = await notifyCustomer({ restaurantUserId: booking.restaurantUserId, bookingId: booking.id, ...notification });
   emitToRestaurant(booking.restaurantId, socketEvents.bookingStatusChanged, booking);
-  emitToCustomer(booking.restaurantUserId, socketEvents.customerBookingUpdated, toBookingResponse(booking));
+  emitToCustomer(booking.restaurantUserId, socketEvents.customerBookingUpdated, toBookingResponse(booking, lang));
 };
 
-export const cancelBooking = async (customerId: string, id: string, reasonLabel: string) => {
+export const cancelBooking = async (customerId: string, id: string, reasonLabel: string, lang: Language = DEFAULT_LANGUAGE) => {
   const reason = CANCELLATION_REASON_BY_LABEL[reasonLabel];
   if (!reason) throw new ApiError(422, "Invalid cancellation reason.");
 
@@ -335,10 +348,10 @@ export const cancelBooking = async (customerId: string, id: string, reasonLabel:
   });
 
   await cancelReminder(existing.reminderJobId);
-  await announceStatusChange(updated, { type: "BOOKING_CANCELLED", title: "Order cancelled", body: `Your order ${updated.humanBookingId} has been cancelled.` });
+  await announceStatusChange(updated, { type: "BOOKING_CANCELLED", message: bookingNotificationMessage("cancelled", updated) });
   emitToRestaurant(existing.restaurantId, socketEvents.bookingCancelled, updated);
 
-  return { booking: toBookingResponse(updated), refund };
+  return { booking: toBookingResponse(updated, lang), refund };
 };
 
 export type AdminBookingListInput = {
@@ -388,7 +401,7 @@ export const listBookingsForAdmin = async (input: AdminBookingListInput) => {
     }),
     prisma.restaurantBooking.count({ where }),
   ]);
-  return { bookings: bookings.map(toBookingResponse), total };
+  return { bookings: bookings.map((booking) => toBookingResponse(booking)), total };
 };
 
 export const getBookingForAdmin = async (id: string) => {
@@ -405,8 +418,8 @@ const assertPreorderEditable = async (customerId: string, bookingId: string) => 
   return booking;
 };
 
-export const getPreorderForCustomer = async (customerId: string, bookingId: string) => {
-  const booking = await getBookingForCustomer(customerId, bookingId);
+export const getPreorderForCustomer = async (customerId: string, bookingId: string, lang: Language = DEFAULT_LANGUAGE) => {
+  const booking = await getBookingForCustomer(customerId, bookingId, lang);
   return booking.preorder ?? { items: [], subtotal: 0, total: 0 };
 };
 
@@ -440,11 +453,11 @@ const loadBooking = async (id: string) => {
   return existing;
 };
 
-const ADVANCE_COPY: Record<string, { timestamp: keyof Prisma.RestaurantBookingUpdateManyMutationInput; type: NotificationType; title: string; body: (b: RestaurantBooking) => string }> = {
-  ACKNOWLEDGED: { timestamp: "acknowledgedAt", type: "BOOKING_ACKNOWLEDGED", title: "Order accepted", body: (b) => `${b.restaurantNameSnapshot} has accepted your order ${b.humanBookingId}. See you at ${to12Hour(b.time)}!` },
-  PREPARING: { timestamp: "preparingAt", type: "BOOKING_PREPARING", title: "Your food is being prepared", body: (b) => `${b.restaurantNameSnapshot} has started preparing your order ${b.humanBookingId}.` },
-  READY: { timestamp: "readyAt", type: "BOOKING_READY", title: "Your food is ready", body: (b) => `Your order ${b.humanBookingId} at ${b.restaurantNameSnapshot} is ready.` },
-  COMPLETED: { timestamp: "completedAt", type: "BOOKING_COMPLETED", title: "Order completed", body: (b) => `Thanks for ordering from ${b.restaurantNameSnapshot}! Your order ${b.humanBookingId} is complete.` },
+const ADVANCE_COPY: Record<string, { timestamp: keyof Prisma.RestaurantBookingUpdateManyMutationInput; type: NotificationType; event: NotificationEvent }> = {
+  ACKNOWLEDGED: { timestamp: "acknowledgedAt", type: "BOOKING_ACKNOWLEDGED", event: "acknowledged" },
+  PREPARING: { timestamp: "preparingAt", type: "BOOKING_PREPARING", event: "preparing" },
+  READY: { timestamp: "readyAt", type: "BOOKING_READY", event: "ready" },
+  COMPLETED: { timestamp: "completedAt", type: "BOOKING_COMPLETED", event: "completed" },
 };
 
 /**
@@ -465,7 +478,7 @@ export const advanceBookingStatus = async (id: string, to: BookingStatus) => {
   });
 
   if (to === "COMPLETED") await cancelReminder(existing.reminderJobId);
-  await announceStatusChange(updated, { type: copy.type, title: copy.title, body: copy.body(updated) });
+  await announceStatusChange(updated, { type: copy.type, message: bookingNotificationMessage(copy.event, updated) });
   return { booking: toBookingResponse(updated), restaurantId: existing.restaurantId };
 };
 
@@ -483,8 +496,7 @@ export const rejectBooking = async (id: string, reason?: string) => {
   await cancelReminder(existing.reminderJobId);
   await announceStatusChange(updated, {
     type: "BOOKING_REJECTED",
-    title: "Order rejected",
-    body: `${updated.restaurantNameSnapshot} couldn't accept your order ${updated.humanBookingId}.${updated.rejectionReason ? ` Reason: ${updated.rejectionReason}.` : ""} Your payment of ₹${refund.amount} is eligible for a full refund.`,
+    message: bookingNotificationMessage("rejected", updated, { amount: refund.amount, reason: updated.rejectionReason }),
   });
   return { booking: toBookingResponse(updated), refund, restaurantId: existing.restaurantId };
 };
@@ -505,8 +517,7 @@ export const adminCancelBooking = async (id: string, reasonLabel: string) => {
   await cancelReminder(existing.reminderJobId);
   await announceStatusChange(updated, {
     type: "BOOKING_CANCELLED",
-    title: "Order cancelled",
-    body: `Your order ${updated.humanBookingId} has been cancelled by the restaurant. Your payment of ₹${refund.amount} is eligible for a full refund.`,
+    message: bookingNotificationMessage("cancelledByRestaurant", updated, { amount: refund.amount }),
   });
   emitToRestaurant(existing.restaurantId, socketEvents.bookingCancelled, updated);
 
