@@ -125,7 +125,7 @@ jobs:
           port: 22
 
           source: "frontend/dist/*"
-          target: "/var/www/restaurant-admin/frontend/dist"
+          target: "/var/www/darshan/darshan-restaurant/frontend/dist"
 
           strip_components: 2
           overwrite: true
